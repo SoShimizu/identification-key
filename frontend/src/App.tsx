@@ -1,20 +1,26 @@
 // frontend/src/App.tsx
 import React from "react";
-import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
-import Box from "@mui/material/Box";
-import Ribbon from "./components/header/Ribbon";
+import { CssBaseline, ThemeProvider, createTheme, Box } from "@mui/material";
 import { useMatrix } from "./hooks/useMatrix";
+import Ribbon from "./components/header/Ribbon";
 import TraitsPanel from "./components/panels/traits/TraitsPanel";
 import HistoryPanel from "./components/panels/history/HistoryPanel";
 import CandidatesPanel, { EngineScore } from "./components/panels/candidates/CandidatesPanel";
+
+// Add Google Font link to HTML Head
+const fontLink = document.createElement('link');
+fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
+fontLink.rel = 'stylesheet';
+document.head.appendChild(fontLink);
+
 
 export type PanelKey = "candidates" | "traits_unselected" | "traits_selected" | "history";
 export type LayoutState = { tl: PanelKey; tr: PanelKey; bl: PanelKey; br: PanelKey };
 
 const DEFAULT_LAYOUT: LayoutState = {
   tl: "candidates",
-  tr: "history",
-  bl: "traits_unselected",
+  tr: "traits_unselected",
+  bl: "history",
   br: "traits_selected",
 };
 
@@ -26,6 +32,7 @@ function loadLayout(): LayoutState {
     return DEFAULT_LAYOUT;
   }
 }
+
 function saveLayout(v: LayoutState) {
   localStorage.setItem("mk.layout.v2", JSON.stringify(v));
 }
@@ -46,11 +53,39 @@ export default function App() {
   const [lang, setLang] = React.useState<"ja" | "en">("ja");
 
   const theme = React.useMemo(
-    () => createTheme({ palette: { mode: themeMode }, typography: { fontSize: 13 } }),
+    () => createTheme({
+      palette: {
+        mode: themeMode,
+        ...(themeMode === 'dark' ? {
+          background: {
+            default: '#0c111c', // A slightly darker background
+            paper: '#1f2937',
+          },
+        } : {
+          background: {
+            default: '#f8f9fa', // A slightly off-white background
+            paper: '#ffffff',
+          }
+        })
+      },
+      typography: {
+        fontFamily: '"Inter", "Helvetica", "Arial", sans-serif',
+        fontSize: 13,
+        h6: { fontWeight: 700 },
+      },
+      components: {
+        MuiPaper: {
+          styleOverrides: {
+            root: {
+              backgroundImage: 'none',
+            }
+          }
+        }
+      }
+    }),
     [themeMode]
   );
 
-  // suggMap -> suggRank
   const suggRank: Record<string, number> = React.useMemo(() => {
     const m = suggMap || {};
     const entries = Object.entries(m).filter(([, v]) => typeof v === "number" && isFinite(v));
@@ -73,17 +108,14 @@ export default function App() {
     }));
   }, [scores]);
 
+  const handleApplied = (res: any) => {
+    console.log("Applied results received in App.tsx", res);
+  };
+
   const renderPanel = (k: PanelKey) => {
     switch (k) {
       case "candidates":
-        return (
-          <CandidatesPanel
-            title={matrixName || "候補タクサ"}
-            rows={candRows}
-            totalTaxa={taxaCount || 0}
-            showMatchSupport={showMatchSupport}
-          />
-        );
+        return <CandidatesPanel title="候補タクサ" rows={candRows} totalTaxa={taxaCount || 0} showMatchSupport={showMatchSupport} />;
       case "history":
         return <HistoryPanel title="選択履歴" items={history as any} />;
       case "traits_unselected":
@@ -101,7 +133,7 @@ export default function App() {
             suggMap={suggMap}
             suggRank={suggRank}
             suggAlgo={suggAlgo}
-            setSuggAlgo={(a) => setSuggAlgo(a)}  // ★ adapter
+            setSuggAlgo={(a) => setSuggAlgo(a)}
           />
         );
       case "traits_selected":
@@ -119,7 +151,7 @@ export default function App() {
             suggMap={suggMap}
             suggRank={suggRank}
             suggAlgo={suggAlgo}
-            setSuggAlgo={(a) => setSuggAlgo(a)}  // ★ adapter
+            setSuggAlgo={(a) => setSuggAlgo(a)}
           />
         );
     }
@@ -130,39 +162,35 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Ribbon
-        // Ribbon 必須
-        matrixName={matrixName || ""}               // ★ 追加
-        selected={selected as Record<string, number>} // ★ 追加
-
-        // i18n / keys / A2
-        lang={lang} setLang={setLang}
-        keys={keys} activeKey={activeKey} onPickKey={pickKey} onRefreshKeys={refreshKeys}
-        mode={mode} setMode={setMode}
-        algo={algo} setAlgo={setAlgo}
-
-        // 表示系
-        themeMode={themeMode} setThemeMode={setThemeMode}
-        layout={layout} onLayoutChange={handleLayoutChange}
-        showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport}
-
-        onHelp={() => alert("Help is coming soon…")}
-      />
-
-      {/* 2×2 レイアウト */}
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
+        <Ribbon
+          matrixName={matrixName || ""}
+          selected={selected as Record<string, number>}
+          onApplied={handleApplied}
+          lang={lang} setLang={setLang}
+          keys={keys} activeKey={activeKey} onPickKey={pickKey} onRefreshKeys={refreshKeys}
+          mode={mode} setMode={setMode}
+          algo={algo} setAlgo={setAlgo}
+          themeMode={themeMode} setThemeMode={setThemeMode}
+          layout={layout} onLayoutChange={handleLayoutChange}
+          showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport}
+          onHelp={() => alert("Help is coming soon…")}
+        />
         <Box
           sx={{
-            display: "grid",
+            flex: 1,
+            p: 2,
             gap: 2,
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gridTemplateRows: { xs: "auto auto auto auto", md: "minmax(44vh, auto) minmax(44vh, auto)" },
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gridTemplateRows: "1fr 1fr",
+            height: "calc(100vh - 48px)", // Subtract header height
           }}
         >
-          <Box sx={{ height: { xs: "45vh", md: "44vh" }, overflow: "hidden" }}>{renderPanel(layout.tl)}</Box>
-          <Box sx={{ height: { xs: "45vh", md: "44vh" }, overflow: "hidden" }}>{renderPanel(layout.tr)}</Box>
-          <Box sx={{ height: { xs: "45vh", md: "44vh" }, overflow: "hidden" }}>{renderPanel(layout.bl)}</Box>
-          <Box sx={{ height: { xs: "45vh", md: "44vh" }, overflow: "hidden" }}>{renderPanel(layout.br)}</Box>
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.tl)}</Box>
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.tr)}</Box>
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.bl)}</Box>
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.br)}</Box>
         </Box>
       </Box>
     </ThemeProvider>

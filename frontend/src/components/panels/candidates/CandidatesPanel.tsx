@@ -1,13 +1,11 @@
+// frontend/src/components/panels/candidates/CandidatesPanel.tsx
 import React from "react";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import Table from "@mui/material/Table";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TableCell from "@mui/material/TableCell";
-import TableBody from "@mui/material/TableBody";
-import TableContainer from "@mui/material/TableContainer";
+import {
+  Paper, Box, Typography, Table, TableHead, TableRow, TableCell,
+  TableBody, TableContainer, LinearProgress,
+  Stack,
+  Chip
+} from "@mui/material";
 
 export type EngineScore = {
   rank?: number;
@@ -20,6 +18,20 @@ export type EngineScore = {
   support?: number;
 };
 
+const ScoreCell = ({ score }: { score: number }) => (
+    <TableCell>
+        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            {(score * 100).toFixed(2)}%
+        </Typography>
+        <LinearProgress
+            variant="determinate"
+            value={score * 100}
+            sx={{ height: 6, borderRadius: 3 }}
+        />
+    </TableCell>
+);
+
+
 export default function CandidatesPanel({
   title, rows, totalTaxa, showMatchSupport = false,
 }: {
@@ -29,35 +41,43 @@ export default function CandidatesPanel({
   showMatchSupport?: boolean;
 }) {
   return (
-    <Paper sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ px: 2, py: 1 }}>
+    <Paper sx={{ height: "100%", display: "flex", flexDirection: "column", p: 1.5 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 0.5, mb: 1 }}>
         <Typography variant="h6">{title || "候補タクサ"}</Typography>
-        <Typography variant="caption" color="text.secondary">{rows?.length ?? 0}/{totalTaxa}</Typography>
-      </Box>
+        <Chip label={`${rows?.length ?? 0} / ${totalTaxa}`} size="small" />
+      </Stack>
 
-      <TableContainer sx={{ flex: 1 }}>
+      <TableContainer component={Box} sx={{ flex: 1 }}>
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ width: 56 }}>#</TableCell>
+              <TableCell sx={{ width: 50 }}>#</TableCell>
               <TableCell>Name</TableCell>
-              <TableCell sx={{ width: 94 }}>Post</TableCell>
-              <TableCell sx={{ width: 94 }}>Δ</TableCell>
-              <TableCell sx={{ width: 80 }}>Used</TableCell>
-              <TableCell sx={{ width: 72 }}>Conf</TableCell>
+              <TableCell sx={{ width: 120 }}>Post</TableCell>
+              <TableCell sx={{ width: 80 }}>Δ</TableCell>
+              <TableCell sx={{ width: 70 }} align="center">Conflicts</TableCell>
               {showMatchSupport && <TableCell sx={{ width: 110 }}>Match/Support</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {(rows || []).map((r, i) => (
-              <TableRow key={r.taxon?.id ?? `${i}-${r.taxon?.name}`} hover>
+              <TableRow
+                key={r.taxon?.id ?? `${i}-${r.taxon?.name}`}
+                hover
+                sx={{ bgcolor: (r.conflicts ?? 0) > 0 ? 'rgba(255, 170, 170, 0.1)' : 'transparent' }}
+              >
                 <TableCell>{r.rank ?? i + 1}</TableCell>
                 <TableCell>{r.taxon?.name}</TableCell>
-                <TableCell>{(r.post ?? 0).toFixed(6)}</TableCell>
-                <TableCell>{(r.delta ?? 0).toFixed(6)}</TableCell>
-                <TableCell>{r.used ?? 0}</TableCell>
-                <TableCell>{r.conflicts ?? 0}</TableCell>
-                {showMatchSupport && <TableCell>{(r.match ?? 0)}/{(r.support ?? 0)}</TableCell>}
+                <ScoreCell score={r.post ?? 0} />
+                <TableCell>{(r.delta ?? 0).toExponential(2)}</TableCell>
+                <TableCell align="center">
+                  {(r.conflicts ?? 0) > 0 ? (
+                    <Chip label={r.conflicts} color="error" size="small" />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">0</Typography>
+                  )}
+                </TableCell>
+                {showMatchSupport && <TableCell>{`${r.match ?? 0}/${r.support ?? 0}`}</TableCell>}
               </TableRow>
             ))}
           </TableBody>

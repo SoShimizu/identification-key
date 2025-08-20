@@ -1,19 +1,9 @@
 // frontend/src/components/panels/traits/TraitsPanel.tsx
 import React, { useMemo } from "react";
-import Paper from "@mui/material/Paper";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
-import Button from "@mui/material/Button";
-import ButtonGroup from "@mui/material/ButtonGroup";
-import Chip from "@mui/material/Chip";
-import Divider from "@mui/material/Divider";
-import Table from "@mui/material/Table";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TableCell from "@mui/material/TableCell";
-import TableBody from "@mui/material/TableBody";
-import TableContainer from "@mui/material/TableContainer";
+import {
+  Paper, Box, Typography, Stack, Button, ButtonGroup, Chip, Table, TableHead,
+  TableRow, TableCell, TableBody, TableContainer, Tooltip
+} from "@mui/material";
 
 type Choice = -1 | 0 | 1;
 
@@ -29,247 +19,156 @@ type Props = {
   setBinary: (traitId: string, val: number, label: string) => void;
   setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
   clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
-
-  // 並べ替え
   sortBy: "recommend" | "group" | "name";
   setSortBy: React.Dispatch<React.SetStateAction<"recommend" | "group" | "name">>;
-
-  // 推奨度（traitID -> スコア）。大きいほど推奨
   suggMap: Record<string, number>;
-
-  // ランク（traitID -> 1,2,3...）。無ければ undefined で「—」
   suggRank?: Record<string, number>;
-
-  // 表示中の指標（現状は GINI / ENTROPY のみ）
   suggAlgo?: "gini" | "entropy";
   setSuggAlgo?: (a: "gini" | "entropy") => void;
 };
 
 function rowScore(row: TraitRow, suggMap: Record<string, number>): number {
-  if (row.type === "binary") return suggMap[row.binary.id] ?? 0;
-  const vals = row.children.map((c) => suggMap[c.id] ?? 0);
-  return vals.length ? Math.max(...vals) : 0;
+  if (row.type === "binary") return suggMap[row.binary.id] ?? -1;
+  const vals = row.children.map((c) => suggMap[c.id] ?? -1);
+  return vals.length > 0 ? Math.max(...vals) : -1;
 }
 
 function rowRank(row: TraitRow, rank?: Record<string, number>): number | undefined {
   if (!rank) return undefined;
   if (row.type === "binary") return rank[row.binary.id];
-  const vals = row.children.map((c) => rank[c.id]).filter((x) => typeof x === "number") as number[];
-  if (!vals.length) return undefined;
-  return Math.min(...vals);
+  const vals = row.children.map((c) => rank?.[c.id]).filter((x): x is number => typeof x === "number");
+  return vals.length > 0 ? Math.min(...vals) : undefined;
 }
 
-function ScoreBar({ value }: { value: number }) {
+const ScoreBar = React.memo(({ value }: { value: number }) => {
   if (!(value > 0)) return null;
-  const w = Math.max(6, Math.round(value * 100));
+  const w = Math.max(2, Math.min(100, Math.round(value * 100)));
   return (
-    <Box sx={{ position: "relative", height: 6, mt: 0.5, borderRadius: 3, bgcolor: "action.hover" }}>
-      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${w}%`, borderRadius: 3, bgcolor: "primary.main", opacity: 0.35 }} />
-    </Box>
+    <Tooltip title={`Normalized score: ${value.toFixed(3)}`}>
+      <Box sx={{ width: '100%', height: 4, mt: 0.5, borderRadius: 2, bgcolor: "action.hover" }}>
+        <Box sx={{ width: `${w}%`, height: '100%', borderRadius: 2, bgcolor: "primary.main", opacity: 0.6 }} />
+      </Box>
+    </Tooltip>
   );
-}
+});
 
-function CellRank({ rank }: { rank?: number }) {
-  return (
-    <TableCell sx={{ width: 90 }}>
-      {typeof rank === "number" ? <Chip size="small" color="primary" variant="outlined" label={`#${rank}`} /> : <Typography variant="body2">—</Typography>}
-    </TableCell>
-  );
-}
 
-function CellScore({ raw, norm }: { raw: number; norm: number }) {
-  return (
-    <TableCell sx={{ width: 140 }}>
-      <Typography variant="body2">{raw > 0 ? raw.toFixed(3) : "—"}</Typography>
-      <ScoreBar value={norm} />
-    </TableCell>
-  );
-}
-
-function RowBinary({
-  r, selected, setBinary, rank, scoreNorm, scoreRaw,
-}: {
-  r: Extract<TraitRow, { type: "binary" }>;
+const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearDerived, rank, scoreNorm, scoreRaw }: {
+  r: TraitRow;
   selected: Record<string, number>;
   setBinary: Props["setBinary"];
-  rank?: number;
-  scoreNorm: number;
-  scoreRaw: number;
-}) {
-  const v = (selected[r.binary.id] ?? 0) as Choice;
-  return (
-    <TableRow hover>
-      <CellRank rank={rank} />
-      <CellScore raw={scoreRaw} norm={scoreNorm} />
-      <TableCell sx={{ width: 180 }}>{r.group}</TableCell>
-      <TableCell><Typography variant="body2">{r.traitName}</Typography></TableCell>
-      <TableCell>
-        <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap" }}>
-          <Button size="small" variant={v === 1 ? "contained" : "outlined"} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>該当</Button>
-          <Button size="small" variant={v === -1 ? "contained" : "outlined"} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>非該当</Button>
-          <Button size="small" variant={v === 0 ? "contained" : "outlined"} onClick={() => setBinary(r.binary.id, 0, r.traitName)}>未選択</Button>
-        </Stack>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function RowDerived({
-  r, selected, setDerivedPick, clearDerived, rank, scoreNorm, scoreRaw,
-}: {
-  r: Extract<TraitRow, { type: "derived" }>;
-  selected: Record<string, number>;
   setDerivedPick: Props["setDerivedPick"];
   clearDerived: Props["clearDerived"];
   rank?: number;
   scoreNorm: number;
   scoreRaw: number;
-}) {
-  const kids = r.children;
-  const chosen = kids.find((c) => selected[c.id] === 1)?.id;
+}) => {
+  const chosenId = r.type === 'derived' ? r.children.find(c => selected[c.id] === 1)?.id : undefined;
+
   return (
     <TableRow hover>
-      <CellRank rank={rank} />
-      <CellScore raw={scoreRaw} norm={scoreNorm} />
-      <TableCell sx={{ width: 180 }}>{r.group}</TableCell>
+      <TableCell align="center">{typeof rank === "number" ? <Chip size="small" label={`#${rank}`} /> : "—"}</TableCell>
+      <TableCell>
+        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{scoreRaw > 0 ? scoreRaw.toFixed(3) : "—"}</Typography>
+        <ScoreBar value={scoreNorm} />
+      </TableCell>
+      <TableCell>{r.group}</TableCell>
       <TableCell><Typography variant="body2">{r.traitName}</Typography></TableCell>
       <TableCell>
-        <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap" }}>
-          {kids.map((c) => (
-            <Button
-              key={c.id}
-              size="small"
-              variant={chosen === c.id ? "contained" : "outlined"}
-              onClick={() => setDerivedPick(kids.map((x) => x.id), c.id, r.traitName)}
-            >
-              {c.label}
-            </Button>
-          ))}
-          <Button size="small" variant="outlined" onClick={() => clearDerived(kids.map((x) => x.id), r.traitName, false)}>未選択</Button>
-          <Button size="small" variant="outlined" onClick={() => clearDerived(kids.map((x) => x.id), r.traitName, true)}>未計測</Button>
-        </Stack>
+        <ButtonGroup variant="outlined" size="small">
+          {r.type === "binary" ? (
+            <>
+              <Button variant={selected[r.binary.id] === 1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>Yes</Button>
+              <Button variant={selected[r.binary.id] === -1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>No</Button>
+              <Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>Clear</Button>
+            </>
+          ) : (
+            <>
+              {r.children.map(c => (
+                <Button key={c.id} variant={chosenId === c.id ? 'contained' : 'outlined'} onClick={() => setDerivedPick(r.children.map(x => x.id), c.id, r.traitName)}>{c.label}</Button>
+              ))}
+              <Button onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>Clear</Button>
+            </>
+          )}
+        </ButtonGroup>
       </TableCell>
     </TableRow>
   );
-}
+});
 
-export default function TraitsPanel({
-  title, mode, rows, selected, setBinary, setDerivedPick, clearDerived,
-  sortBy, setSortBy, suggMap, suggRank, suggAlgo, setSuggAlgo,
-}: Props) {
-  const scoreOf = (x: TraitRow) => rowScore(x, suggMap);
-  const rankOf  = (x: TraitRow) => rowRank(x, suggRank);
+export default function TraitsPanel(props: Props) {
+  const { title, mode, rows, selected, setBinary, setDerivedPick, clearDerived, sortBy, setSortBy, suggMap, suggRank } = props;
 
-  const sorted = useMemo(() => {
-    const arr = [...rows];
-    if (sortBy === "group") {
-      arr.sort((a, b) => (a.group || "").localeCompare(b.group || "") || a.traitName.localeCompare(b.traitName));
-    } else if (sortBy === "name") {
-      arr.sort((a, b) => a.traitName.localeCompare(b.traitName));
-    } else {
-      arr.sort((a, b) => {
-        const ra = rankOf(a); const rb = rankOf(b);
-        if (typeof ra === "number" && typeof rb === "number" && ra !== rb) return ra - rb;
-        const sa = scoreOf(a); const sb = scoreOf(b);
-        if (sb !== sa) return sb - sa;
-        return a.traitName.localeCompare(b.traitName);
-      });
-    }
-    return arr;
-  }, [rows, sortBy, suggMap, suggRank]); // eslint-disable-line
+  const filteredAndSortedRows = useMemo(() => {
+    const scoreOf = (x: TraitRow) => rowScore(x, suggMap);
+    const rankOf  = (x: TraitRow) => rowRank(x, suggRank);
 
-  const norm = useMemo(() => {
-    const vals = rows.map(scoreOf);
-    const max = Math.max(0, ...vals);
-    const min = Math.min(0, ...vals);
-    if (max === min) return (_: TraitRow) => 1;
-    return (r: TraitRow) => (scoreOf(r) - min) / (max - min);
+    const filtered = rows.filter(r => {
+      const isSelected = r.type === "binary" ? (selected[r.binary.id] ?? 0) !== 0 : r.children.some(c => selected[c.id] === 1);
+      return mode === 'selected' ? isSelected : !isSelected;
+    });
+
+    return filtered.sort((a, b) => {
+      if (sortBy === "recommend") {
+        const rankA = rankOf(a); const rankB = rankOf(b);
+        if (rankA !== undefined && rankB !== undefined && rankA !== rankB) return rankA - rankB;
+        const scoreA = scoreOf(a); const scoreB = scoreOf(b);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+      }
+      if (sortBy === "group") {
+        const groupCompare = (a.group || "").localeCompare(b.group || "");
+        if (groupCompare !== 0) return groupCompare;
+      }
+      return a.traitName.localeCompare(b.traitName);
+    });
+  }, [rows, mode, selected, sortBy, suggMap, suggRank]);
+
+  const scoreNormalizer = useMemo(() => {
+    const scores = rows.map(r => rowScore(r, suggMap)).filter(s => s >= 0);
+    if (scores.length === 0) return () => 0;
+    const max = Math.max(...scores);
+    return (score: number) => (max > 0 ? score / max : 0);
   }, [rows, suggMap]);
-
-  const list = useMemo(() => {
-    if (mode === "unselected") {
-      return sorted.filter((r) =>
-        r.type === "binary"
-          ? (selected[r.binary.id] ?? 0) === 0
-          : !r.children.some((c) => selected[c.id] === 1)
-      );
-    }
-    return sorted.filter((r) =>
-      r.type === "binary"
-        ? (selected[r.binary.id] ?? 0) !== 0
-        : r.children.some((c) => selected[c.id] === 1)
-    );
-  }, [sorted, selected, mode]);
 
   return (
     <Paper sx={{ p: 1.5, display: "flex", flexDirection: "column", height: "100%" }}>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-        <Typography variant="h6" sx={{ flex: 1 }}>
-          {title || "形質フィルタ"}
-          <Typography component="span" variant="caption" sx={{ ml: 1, color: "text.secondary" }}>
-            {suggAlgo ? `（指標: ${suggAlgo.toUpperCase()}）` : null}
-          </Typography>
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <ButtonGroup size="small" variant="outlined">
-            <Button onClick={() => setSortBy("recommend")} variant={sortBy === "recommend" ? "contained" : "outlined"}>推奨順</Button>
-            <Button onClick={() => setSortBy("group")}     variant={sortBy === "group"     ? "contained" : "outlined"}>グループ</Button>
-            <Button onClick={() => setSortBy("name")}      variant={sortBy === "name"      ? "contained" : "outlined"}>名前</Button>
-          </ButtonGroup>
-          {setSuggAlgo && (
-            <ButtonGroup size="small" variant="outlined">
-              <Button onClick={() => setSuggAlgo!("gini")}    variant={suggAlgo === "gini"    ? "contained" : "outlined"}>GINI</Button>
-              <Button onClick={() => setSuggAlgo!("entropy")} variant={suggAlgo === "entropy" ? "contained" : "outlined"}>ENTROPY</Button>
-            </ButtonGroup>
-          )}
-        </Stack>
-      </Box>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1, px: 0.5 }}>
+        <Typography variant="h6">{title}</Typography>
+        <ButtonGroup size="small" variant="outlined">
+          <Button onClick={() => setSortBy("recommend")} variant={sortBy === "recommend" ? "contained" : "outlined"}>推奨順</Button>
+          <Button onClick={() => setSortBy("group")} variant={sortBy === "group" ? "contained" : "outlined"}>グループ別</Button>
+          <Button onClick={() => setSortBy("name")} variant={sortBy === "name" ? "contained" : "outlined"}>名前順</Button>
+        </ButtonGroup>
+      </Stack>
 
-      <Typography variant="subtitle2" sx={{ px: 0.5, pb: 0.5, color: "text.secondary" }}>
-        {mode === "unselected" ? "未選択の形質" : "選択済みの形質"}
-      </Typography>
-
-      <TableContainer sx={{ flex: 1, overflow: "auto", border: (t) => `1px solid ${t.palette.divider}`, borderRadius: 1 }}>
+      <TableContainer component={Box} sx={{ flex: 1 }}>
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ width: 90  }}>#</TableCell>
-              <TableCell sx={{ width: 140 }}>score</TableCell>
-              <TableCell sx={{ width: 180 }}>group</TableCell>
-              <TableCell>trait</TableCell>
-              <TableCell>state</TableCell>
+              <TableCell sx={{ width: 80 }} align="center">Rank</TableCell>
+              <TableCell sx={{ width: 120 }}>Score</TableCell>
+              <TableCell sx={{ width: 160 }}>Group</TableCell>
+              <TableCell>Trait</TableCell>
+              <TableCell>State</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {list.map((r, i) =>
-              r.type === "binary" ? (
-                <RowBinary
-                  key={`${r.traitName}-${i}`}
-                  r={r}
-                  selected={selected}
-                  setBinary={setBinary}
-                  rank={rowRank(r, suggRank)}
-                  scoreNorm={norm(r)}
-                  scoreRaw={rowScore(r, suggMap)}
-                />
-              ) : (
-                <RowDerived
-                  key={`${r.traitName}-${i}`}
-                  r={r}
-                  selected={selected}
-                  setDerivedPick={setDerivedPick}
-                  clearDerived={clearDerived}
-                  rank={rowRank(r, suggRank)}
-                  scoreNorm={norm(r)}
-                  scoreRaw={rowScore(r, suggMap)}
-                />
-              )
-            )}
+            {filteredAndSortedRows.map((r) => (
+              <RowRenderer
+                key={r.type === 'binary' ? r.binary.id : r.traitName}
+                r={r}
+                selected={selected}
+                setBinary={setBinary}
+                setDerivedPick={setDerivedPick}
+                clearDerived={clearDerived}
+                rank={rowRank(r, suggRank)}
+                scoreRaw={rowScore(r, suggMap)}
+                scoreNorm={scoreNormalizer(rowScore(r, suggMap))}
+              />
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
-
-      <Divider sx={{ mt: 1 }} />
     </Paper>
   );
 }
