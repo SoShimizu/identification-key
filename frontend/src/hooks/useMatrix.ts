@@ -24,8 +24,10 @@ type UseMatrixReturn = {
     taxaCount: number;
     selected: Record<string, Choice>;
     setBinary: (traitId: string, val: Choice, label?: string) => void;
+    setContinuous: (traitId: string, val: number | null, label?: string) => void; 
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel?: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
+    clearAllSelections: () => void;
     mode: "strict" | "lenient";
     setMode: (newMode: "strict" | "lenient") => void;
     algo: "bayes" | "heuristic";
@@ -149,9 +151,28 @@ export function useMatrix(): UseMatrixReturn {
   // === Selection Handlers ===
   const setBinary = useCallback((traitId: string, val: Choice, label?: string) => {
     setSelected((prev) => {
-      const next = { ...prev, [traitId]: val };
+      const next = { ...prev };
+      if (val === 0) {
+          delete next[traitId];
+      } else {
+          next[traitId] = val;
+      }
       setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => ${val}` }, ...h].slice(0, 200));
       return next;
+    });
+  }, []);
+
+  const setContinuous = useCallback((traitId: string, val: number | null, label?: string) => {
+    setSelected((prev) => {
+        const next = { ...prev };
+        if (val === null) {
+            delete next[traitId];
+            setHistory((h) => [{ t: Date.now(), text: `Clear ${label || traitId}` }, ...h].slice(0, 200));
+        } else {
+            next[traitId] = val;
+            setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => ${val}` }, ...h].slice(0, 200));
+        }
+        return next;
     });
   }, []);
 
@@ -167,10 +188,15 @@ export function useMatrix(): UseMatrixReturn {
   const clearDerived = useCallback((childrenIds: string[], parentLabel?: string, asNA?: boolean) => {
     setSelected((prev) => {
       const next = { ...prev };
-      for (const cid of childrenIds) next[cid] = 0 as Choice;
+      for (const cid of childrenIds) delete next[cid];
       setHistory((h) => [{ t: Date.now(), text: `${asNA ? "Set NA" : "Clear"} ${parentLabel || "(derived)"}` }, ...h].slice(0, 200));
       return next;
     });
+  }, []);
+
+  const clearAllSelections = useCallback(() => {
+    setSelected({});
+    setHistory([]);
   }, []);
 
   // === Memoized derived state ===
@@ -184,46 +210,49 @@ export function useMatrix(): UseMatrixReturn {
     return m;
   }, [suggs]);
 
-  const rows: TraitRow[] = useMemo(() => {
-    const byParent: Record<string, Trait[]> = {};
-    const parents: Record<string, Trait> = {};
-    const binaryTraits: Trait[] = [];
+    const rows: TraitRow[] = useMemo(() => {
+        const byParent: Record<string, Trait[]> = {};
+        const parents: Record<string, Trait> = {};
+        const otherTraits: Trait[] = [];
 
-    for (const t of traits) {
-        // ✨ 修正: `continuous_parent` も親形質として正しく認識させる
-        if (t.type === 'nominal_parent' || t.type === 'continuous_parent') {
-            parents[t.name] = t;
-        } else if (t.type === 'derived' && t.parent) {
-            if (!byParent[t.parent]) byParent[t.parent] = [];
-            byParent[t.parent].push(t);
-        } else if (t.type === 'binary') {
-            binaryTraits.push(t);
+        for (const t of traits) {
+            if (t.type === 'nominal_parent') {
+                parents[t.name] = t;
+            } else if (t.type === 'derived' && t.parent) {
+                if (!byParent[t.parent]) byParent[t.parent] = [];
+                byParent[t.parent].push(t);
+            } else {
+                otherTraits.push(t);
+            }
         }
-    }
 
-    const out: TraitRow[] = [];
-    for (const parentName in byParent) {
-        const parentTrait = parents[parentName];
-        if (parentTrait && byParent[parentName]) {
-            out.push({
-                group: parentTrait.group || "",
-                traitName: parentName,
-                type: "derived",
-                parentTrait: parentTrait, 
-                children: byParent[parentName].map(c => ({ id: c.id, label: c.state || c.name })),
-            });
+        const out: TraitRow[] = [];
+        for (const parentName in byParent) {
+            const parentTrait = parents[parentName];
+            if (parentTrait && byParent[parentName]) {
+                out.push({
+                    group: parentTrait.group || "",
+                    traitName: parentName,
+                    type: "derived",
+                    parentTrait: parentTrait,
+                    children: byParent[parentName].map(c => ({ id: c.id, label: c.state || c.name })),
+                });
+            }
         }
-    }
 
-    for (const t of binaryTraits) {
-        out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
-    }
-    return out;
-  }, [traits]);
+        for (const t of otherTraits) {
+            if (t.type === 'binary') {
+                out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
+            } else if (t.type === 'continuous') {
+                out.push({ group: t.group || "", traitName: t.name, type: "continuous", continuous: { ...t } });
+            }
+        }
+        return out;
+    }, [traits]);
   
   return {
     rows, traits, matrixName, taxaCount,
-    selected, setBinary, setDerivedPick, clearDerived,
+    selected, setBinary, setContinuous, setDerivedPick, clearDerived, clearAllSelections,
     mode, setMode, algo, setAlgo, opts, setOpts,
     scores, suggs, suggMap, sortBy, setSortBy, suggAlgo, setSuggAlgo,
     pickKey, keys, activeKey, refreshKeys,

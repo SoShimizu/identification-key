@@ -17,7 +17,7 @@ document.head.appendChild(fontLink);
 export default function App() {
   const {
     matrixName, taxaCount, rows, traits,
-    selected, setBinary, setDerivedPick, clearDerived,
+    selected, setBinary, setContinuous, setDerivedPick, clearDerived, clearAllSelections,
     scores, suggMap, sortBy, setSortBy,
     mode, setMode,
     algo, setAlgo,
@@ -27,7 +27,6 @@ export default function App() {
   } = useMatrix();
 
   const [themeMode, setThemeMode] = React.useState<"light" | "dark">("dark");
-  const [showMatchSupport, setShowMatchSupport] = React.useState<boolean>(false);
   const [lang, setLang] = React.useState<"ja" | "en">("ja");
   const [comparisonList, setComparisonList] = React.useState<string[]>([]);
   const [comparisonOpen, setComparisonOpen] = React.useState(false);
@@ -95,15 +94,11 @@ export default function App() {
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
         <Ribbon
           lang={lang} setLang={setLang}
-          matrixName={matrixName || ""}
-          selected={selected as Record<string, number>}
           keys={keys} activeKey={activeKey} onPickKey={pickKey} onRefreshKeys={refreshKeys}
-          mode={mode}
-          setMode={setMode}
           algo={algo} setAlgo={setAlgo}
           themeMode={themeMode} setThemeMode={setThemeMode}
-          showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport}
-          onHelp={() => alert("Help is coming soon…")}
+          opts={opts} setOpts={setOpts}
+          matrixName={matrixName}
         />
         <Box
           sx={{
@@ -113,30 +108,31 @@ export default function App() {
             display: 'flex',
             flexDirection: 'column',
             height: 'calc(100vh - 48px)',
+            position: 'relative',
           }}
         >
-          {/* ✨ 修正: flexの比率を調整 */}
           <Box sx={{ flex: 2, minHeight: 0 }}>
             <CandidatesPanel
               lang={lang}
               title={T.panels.candidates}
               rows={candRows}
               totalTaxa={taxaCount || 0}
-              showMatchSupport={showMatchSupport}
+              algo={algo}
               comparisonList={comparisonList}
               setComparisonList={setComparisonList}
               onCompareClick={() => setComparisonOpen(true)}
             />
           </Box>
-          {/* ✨ 修正: flexの比率を調整 */}
           <Box sx={{ flex: 3, minHeight: 0 }}>
              <TraitsTabsPanel
                 lang={lang}
                 rows={rows}
                 selected={selected as Record<string, number>}
                 setBinary={(id, val, label) => setBinary(id, val as Choice, label)}
+                setContinuous={setContinuous}
                 setDerivedPick={setDerivedPick}
                 clearDerived={clearDerived}
+                clearAllSelections={clearAllSelections}
                 sortBy={sortBy}
                 setSortBy={setSortBy}
                 suggMap={suggMap}

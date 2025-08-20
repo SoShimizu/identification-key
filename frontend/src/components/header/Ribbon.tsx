@@ -1,20 +1,19 @@
 // frontend/src/components/header/Ribbon.tsx
 import React, { useState } from "react";
 import {
-  AppBar, Box, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, Stack, Switch, Tab, Tabs, Toolbar, Tooltip, Typography
+  AppBar, Box, Collapse, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Toolbar, Tooltip, Typography, Switch
 } from "@mui/material";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import TuneIcon from "@mui/icons-material/Tune";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import SettingsIcon from '@mui/icons-material/Settings';
+import ScienceIcon from '@mui/icons-material/Science';
 import TranslateIcon from '@mui/icons-material/Translate';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
+import HomeIcon from '@mui/icons-material/Home'; 
 
-import RibbonAlgoTab from "./RibbonAlgoTab";
-import RibbonOverviewTab from "./RibbonOverviewTab";
-import RibbonViewTab from "./RibbonViewTab";
-import RibbonManualTab from "./RibbonManualTab";
+import RibbonWelcomeTab from "./RibbonWelcomeTab";
+import RibbonCandidatesTab from "./RibbonCandidatesTab";
+import RibbonTraitsTab from "./RibbonTraitsTab"; 
 import { STR } from "../../i18n";
+import { AlgoOptions } from "../../hooks/useAlgoOpts";
+import { BrowserOpenURL } from "../../../wailsjs/runtime";
 
 type KeyInfoLike = { name: string; path?: string };
 
@@ -25,58 +24,48 @@ export type RibbonProps = {
   activeKey?: string;
   onPickKey: (name: string) => Promise<void>;
   onRefreshKeys: () => Promise<void>;
-  mode: "lenient" | "strict";
-  setMode: (mode: "lenient" | "strict") => void;
   algo: "bayes" | "heuristic";
   setAlgo: React.Dispatch<React.SetStateAction<"bayes" | "heuristic">>;
-  onHelp: () => void;
   themeMode: "dark" | "light";
   setThemeMode: (m: "dark" | "light") => void;
-  showMatchSupport: boolean;
-  setShowMatchSupport: (b: boolean) => void;
+  opts: AlgoOptions;
+  setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>;
   matrixName: string;
-  selected: Record<string, number>;
-  onApplied?: (res: any) => void;
 };
 
-type TabKey = "overview" | "algo" | "view" | "manual";
+type TabKey = "welcome" | "candidates" | "traits";
 
 export default function Ribbon(props: RibbonProps) {
   const {
     lang, setLang,
-    keys, activeKey, onPickKey, onRefreshKeys,
-    mode, setMode,
+    keys, activeKey, onPickKey,
     algo, setAlgo,
-    onHelp,
     themeMode, setThemeMode,
-    showMatchSupport, setShowMatchSupport,
-    matrixName, selected, onApplied,
+    opts, setOpts,
+    matrixName,
   } = props;
 
   const T = STR[lang];
   
   const [tab, setTab] = useState<TabKey | false>(false);
-  const [debugOpen, setDebugOpen] = useState(false);
 
   return (
     <AppBar
-        position="static"
+        position="relative" 
         color="default"
         elevation={0}
         sx={{
-            borderBottom: (t) => `1px solid ${t.palette.divider}`,
-            zIndex: 1201,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)'
+            zIndex: (theme) => theme.zIndex.drawer + 1,
         }}
-        onMouseLeave={() => setTab(false)}
     >
       <Toolbar sx={{ px: 2, minHeight: 48, gap: 2 }}>
-        <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold" }}>{T.appTitle}</Typography>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
-          <Tab onMouseEnter={() => setTab("overview")} icon={<InfoOutlinedIcon />} iconPosition="start" label={T.ribbon.overview} value="overview" />
-          <Tab onMouseEnter={() => setTab("algo")} icon={<TuneIcon />} iconPosition="start" label={T.ribbon.algorithm} value="algo" />
-          <Tab onMouseEnter={() => setTab("view")} icon={<SettingsIcon />} iconPosition="start" label={T.ribbon.viewSettings} value="view" />
-          <Tab onMouseEnter={() => setTab("manual")} icon={<MenuBookIcon />} iconPosition="start" label={T.ribbon.manual} value="manual" />
+        <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold", cursor: 'pointer' }} onClick={() => BrowserOpenURL("https://github.com/soshimizu/identification-key")}>
+            {T.appTitle}
+        </Typography>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} onMouseLeave={() => setTab(false)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
+          <Tab onMouseEnter={() => setTab("welcome")} icon={<HomeIcon />} iconPosition="start" label={T.ribbon.welcome} value="welcome" />
+          <Tab onMouseEnter={() => setTab("candidates")} icon={<ScienceIcon />} iconPosition="start" label={T.ribbon.candidates_settings} value="candidates" />
+          <Tab onMouseEnter={() => setTab("traits")} icon={<TuneIcon />} iconPosition="start" label={T.ribbon.traits_settings} value="traits" />
         </Tabs>
         <Box sx={{ flex: 1 }} />
         {onPickKey && (
@@ -99,17 +88,26 @@ export default function Ribbon(props: RibbonProps) {
         <Tooltip title={T.ribbon.switchTheme}>
             <Switch checked={themeMode === 'dark'} onChange={(e) => setThemeMode(e.target.checked ? 'dark' : 'light')} />
         </Tooltip>
-        <Tooltip title={T.ribbon.help}>
-            <IconButton onClick={onHelp}><HelpOutlineIcon /></IconButton>
-        </Tooltip>
       </Toolbar>
 
-      <Collapse in={tab !== false}>
-        <Box sx={{ px: 2, py: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, bgcolor: 'background.default' }}>
-          {tab === "overview" && <RibbonOverviewTab lang={lang} matrixName={matrixName} selected={selected} debugOpen={debugOpen} setDebugOpen={setDebugOpen} />}
-          {tab === "algo" && <RibbonAlgoTab lang={lang} matrixName={matrixName} selected={selected} onApplied={onApplied} algorithm={algo} onAlgorithmChange={setAlgo} mode={mode} onModeChange={setMode} />}
-          {tab === "view" && <RibbonViewTab lang={lang} showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport} />}
-          {tab === "manual" && <RibbonManualTab lang={lang} />}
+      <Collapse in={tab !== false} timeout="auto">
+        <Box 
+            onMouseEnter={() => setTab(tab)} onMouseLeave={() => setTab(false)}
+            sx={{ 
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                px: 2, 
+                py: 2, 
+                bgcolor: 'background.default',
+                boxShadow: '0px 4px 12px -2px rgba(0,0,0,0.1)',
+                borderBottom: 1,
+                borderBottomColor: (theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.300',
+            }}
+        >
+          {tab === "welcome" && <RibbonWelcomeTab lang={lang} />}
+          {tab === "candidates" && <RibbonCandidatesTab lang={lang} matrixName={matrixName} algorithm={algo} onAlgorithmChange={setAlgo} opts={opts} setOpts={setOpts} />}
+          {tab === "traits" && <RibbonTraitsTab lang={lang} opts={opts} setOpts={setOpts} />}
         </Box>
       </Collapse>
     </AppBar>

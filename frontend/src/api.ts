@@ -2,22 +2,24 @@
 import { engine, main } from "../wailsjs/go/models";
 import { GetMatrix } from "../wailsjs/go/main/App";
 
-// フロントと Go 間の共有型（Go側の json タグと一致）
-export type Choice = -1 | 0 | 1;
+// For binary traits, -1, 0, 1. For continuous, the float value.
+export type Choice = number; 
 
 // Goの `engine.Trait` 構造体と型を一致させる
 export type Trait = {
   id: string;
   name: string;
   group: string;
-  // ✨ 修正: 'continuous_parent' 型を追加
-  type: "binary" | "derived" | "nominal_parent" | "continuous_parent";
+  type: "binary" | "derived" | "nominal_parent" | "continuous";
   parent?: string;
   state?: string;
   difficulty?: number;
   risk?: number;
   helpText?: string;
   helpImages?: string[];
+  minValue?: number;
+  maxValue?: number;
+  isInteger?: boolean; // Add this line
 };
 
 export type Taxon = engine.Taxon;

@@ -1,9 +1,24 @@
 export namespace engine {
 	
+	export class ContinuousValue {
+	    min: number;
+	    max: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContinuousValue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.min = source["min"];
+	        this.max = source["max"];
+	    }
+	}
 	export class Taxon {
 	    id: string;
 	    name: string;
 	    traits: Record<string, number>;
+	    continuousTraits: Record<string, ContinuousValue>;
 	
 	    static createFrom(source: any = {}) {
 	        return new Taxon(source);
@@ -14,7 +29,26 @@ export namespace engine {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.traits = source["traits"];
+	        this.continuousTraits = this.convertValues(source["continuousTraits"], ContinuousValue, true);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Trait {
 	    id: string;
@@ -27,6 +61,9 @@ export namespace engine {
 	    risk?: number;
 	    helpText?: string;
 	    helpImages?: string[];
+	    minValue?: number;
+	    maxValue?: number;
+	    isInteger?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Trait(source);
@@ -44,6 +81,9 @@ export namespace engine {
 	        this.risk = source["risk"];
 	        this.helpText = source["helpText"];
 	        this.helpImages = source["helpImages"];
+	        this.minValue = source["minValue"];
+	        this.maxValue = source["maxValue"];
+	        this.isInteger = source["isInteger"];
 	    }
 	}
 	export class Matrix {

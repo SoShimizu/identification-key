@@ -24,6 +24,37 @@ type LoadSummary struct {
 
 var reFullWidthDigit = regexp.MustCompile(`[０-９－]+`)
 
+// parseRange parses a string like "5.0" or "1.4-1.5" into a ContinuousValue.
+func parseRange(s string) (ContinuousValue, bool) {
+	s = strings.TrimSpace(toHalfWidthNums(s))
+	s = strings.ReplaceAll(s, ",", "")
+
+	if s == "" {
+		return ContinuousValue{}, false
+	}
+
+	parts := strings.Split(s, "-")
+	if len(parts) == 1 {
+		val, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			return ContinuousValue{}, false
+		}
+		return ContinuousValue{Min: val, Max: val}, true
+	} else if len(parts) == 2 {
+		min, errMin := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		max, errMax := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if errMin != nil || errMax != nil {
+			return ContinuousValue{}, false
+		}
+		if min > max {
+			min, max = max, min // Swap if order is wrong
+		}
+		return ContinuousValue{Min: min, Max: max}, true
+	}
+
+	return ContinuousValue{}, false
+}
+
 func toHalfWidthNums(s string) string {
 	repl := strings.NewReplacer(
 		"０", "0", "１", "1", "２", "2", "３", "3", "４", "4",
@@ -114,10 +145,8 @@ const (
 )
 
 type typeSpec struct {
-	kind     traitKind
-	states   []string
-	min, max float64
-	bins     int
+	kind   traitKind
+	states []string
 }
 
 func parseStateList(s string) []string {
@@ -168,42 +197,9 @@ func parseTypeSpec(s string) typeSpec {
 		return typeSpec{kind: kindOrdinal, states: parseStateListOrdered(inside)}
 	}
 	if strings.HasPrefix(x, "continuous") {
-		inside := strings.TrimSpace(x[len("continuous"):])
-		min, max := math.NaN(), math.NaN()
-		bins := 5
-		if strings.HasPrefix(inside, "[") && strings.HasSuffix(inside, "]") {
-			body := strings.TrimSpace(inside[1 : len(inside)-1])
-			parts := strings.Split(body, ";")
-			if len(parts) > 0 && strings.Contains(parts[0], "..") {
-				rp := strings.Split(parts[0], "..")
-				if len(rp) == 2 {
-					if v, err := strconv.ParseFloat(strings.TrimSpace(rp[0]), 64); err == nil {
-						min = v
-					}
-					if v, err := strconv.ParseFloat(strings.TrimSpace(rp[1]), 64); err == nil {
-						max = v
-					}
-				}
-			}
-			for _, kv := range parts[1:] {
-				kv = strings.TrimSpace(kv)
-				if strings.HasPrefix(kv, "bins=") {
-					if v, err := strconv.Atoi(strings.TrimSpace(kv[len("bins="):])); err == nil && v >= 2 {
-						bins = v
-					}
-				}
-			}
-		}
-		return typeSpec{kind: kindContinuous, min: min, max: max, bins: bins}
+		return typeSpec{kind: kindContinuous}
 	}
 	return typeSpec{kind: kindBinary}
-}
-
-func binLabel(a, b float64, last bool) string {
-	if last {
-		return fmt.Sprintf("[%.4g～%.4g]", a, b)
-	}
-	return fmt.Sprintf("[%.4g～%.4g)", a, b)
 }
 
 func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
@@ -250,7 +246,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				colIdxParent = i
 			case "#helptext":
 				colIdxHelpText = i
-			case "#helpimages": // ✨修正: ヘッダー名を複数形に
+			case "#helpimages":
 				colIdxHelpImage = i
 			}
 		} else if cleanHeader != "" {
@@ -271,7 +267,12 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	m.Taxa = []Taxon{}
 	taxonIndex := map[string]int{}
 	for i, nm := range taxonNames {
-		m.Taxa = append(m.Taxa, Taxon{ID: nm, Name: nm, Traits: map[string]Ternary{}})
+		m.Taxa = append(m.Taxa, Taxon{
+			ID:               nm,
+			Name:             nm,
+			Traits:           make(map[string]Ternary),
+			ContinuousTraits: make(map[string]ContinuousValue),
+		})
 		taxonIndex[nm] = i
 	}
 
@@ -355,8 +356,8 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					State:      st,
 					Difficulty: difficultyVal,
 					Risk:       riskVal,
-					HelpText:   helpText,   // ✨修正: 親のヘルプ情報を継承
-					HelpImages: helpImages, // ✨修正: 親のヘルプ情報を継承
+					HelpText:   helpText,
+					HelpImages: helpImages,
 				})
 			}
 			for i, col := range taxonCols {
@@ -384,78 +385,46 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindContinuous:
-			values := make([]float64, len(taxonCols))
-			have := make([]bool, len(taxonCols))
-			minv, maxv := math.Inf(1), math.Inf(-1)
+			traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			overallMin, overallMax := math.Inf(1), math.Inf(-1)
+			hasValues := false
+			isInteger := true // Assume integer until a float is found
+
 			for i, col := range taxonCols {
-				raw := getCell(rows, r, col)
-				if v, err := strconv.ParseFloat(strings.ReplaceAll(toHalfWidthNums(raw), ",", ""), 64); err == nil {
-					values[i], have[i] = v, true
-					if v < minv {
-						minv = v
+				valStr := getCell(rows, r, col)
+				if val, ok := parseRange(valStr); ok {
+					idx := taxonIndex[taxonNames[i]]
+					m.Taxa[idx].ContinuousTraits[traitID] = val
+
+					if val.Min < overallMin {
+						overallMin = val.Min
 					}
-					if v > maxv {
-						maxv = v
+					if val.Max > overallMax {
+						overallMax = val.Max
+					}
+					hasValues = true
+
+					// Check if values are integers
+					if val.Min != math.Floor(val.Min) || val.Max != math.Floor(val.Max) {
+						isInteger = false
 					}
 				}
 			}
-			min, max := spec.min, spec.max
-			if math.IsNaN(min) || math.IsNaN(max) || min >= max {
-				if minv == math.Inf(1) || maxv == math.Inf(-1) {
-					continue
-				}
-				min, max = minv, maxv
-			}
-			bins := spec.bins
-			if bins < 2 {
-				bins = 5
-			}
-			edges := make([]float64, bins+1)
-			for i := 0; i <= bins; i++ {
-				edges[i] = min + (max-min)*float64(i)/float64(bins)
-			}
 
-			parentTraitID := fmt.Sprintf("t%04d_parent", len(m.Traits)+1)
-			m.Traits = append(m.Traits, Trait{ID: parentTraitID, Name: traitName, Group: group, Type: "continuous_parent", Difficulty: difficultyVal, Risk: riskVal, HelpText: helpText, HelpImages: helpImages})
-
-			derivedIDs := make([]string, bins)
-			for i := 0; i < bins; i++ {
-				tid := fmt.Sprintf("t%04d", len(m.Traits)+1)
-				derivedIDs[i] = tid
-				label := binLabel(edges[i], edges[i+1], i == bins-1)
+			if hasValues {
 				m.Traits = append(m.Traits, Trait{
-					ID:         tid,
-					Name:       fmt.Sprintf("%s = %s", traitName, label),
+					ID:         traitID,
+					Name:       traitName,
 					Group:      group,
-					Type:       "derived",
-					Parent:     traitName,
-					State:      label,
+					Type:       "continuous",
 					Difficulty: difficultyVal,
 					Risk:       riskVal,
-					HelpText:   helpText,   // ✨修正: 親のヘルプ情報を継承
-					HelpImages: helpImages, // ✨修正: 親のヘルプ情報を継承
+					HelpText:   helpText,
+					HelpImages: helpImages,
+					MinValue:   overallMin,
+					MaxValue:   overallMax,
+					IsInteger:  isInteger,
 				})
-			}
-			for i := range taxonCols {
-				idx := taxonIndex[taxonNames[i]]
-				if !have[i] {
-					for _, tid := range derivedIDs {
-						m.Taxa[idx].Traits[tid] = NA
-					}
-					continue
-				}
-				v := values[i]
-				bin := -1
-				for j := 0; j < bins; j++ {
-					last := (j == bins-1)
-					if (!last && v >= edges[j] && v < edges[j+1]) || (last && v >= edges[j] && v <= edges[j+1]) {
-						bin = j
-						break
-					}
-				}
-				for j, tid := range derivedIDs {
-					m.Taxa[idx].Traits[tid] = Nary(j == bin)
-				}
 			}
 		}
 	}

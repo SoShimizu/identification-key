@@ -1,13 +1,12 @@
 // frontend/src/components/panels/candidates/CandidatesPanel.tsx
-import React from "react";
+import React, { useState } from "react";
 import {
   Paper, Box, Typography, Table, TableHead, TableRow, TableCell,
   TableBody, TableContainer, LinearProgress, Tooltip, Chip,
-  Stack, Checkbox, Button
+  Stack, Checkbox, Button, FormControlLabel, Switch
 } from "@mui/material";
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import { STR } from "../../../i18n";
-import { Taxon } from "../../../api";
 
 export type EngineScore = {
   rank?: number;
@@ -34,19 +33,20 @@ const ScoreCell = ({ score }: { score: number }) => (
 );
 
 export default function CandidatesPanel({
-  title, rows, totalTaxa, showMatchSupport = false, lang = "ja",
+  title, rows, totalTaxa, lang = "ja", algo,
   comparisonList, setComparisonList, onCompareClick,
 }: {
   title?: string;
   rows: EngineScore[];
   totalTaxa: number;
-  showMatchSupport?: boolean;
   lang?: "ja" | "en";
+  algo: "bayes" | "heuristic";
   comparisonList: string[];
   setComparisonList: React.Dispatch<React.SetStateAction<string[]>>;
   onCompareClick: () => void;
 }) {
   const T = STR[lang].candidatesPanel;
+  const [showMatchSupport, setShowMatchSupport] = useState<boolean>(false);
 
   const handleCompareChange = (taxonId: string, checked: boolean) => {
     if (checked) {
@@ -55,6 +55,9 @@ export default function CandidatesPanel({
         setComparisonList(prev => prev.filter(id => id !== taxonId));
     }
   };
+  
+  const scoreHeader = algo === 'bayes' ? T.header_post_prob : T.header_score;
+  const scoreTooltip = algo === 'bayes' ? T.tooltip_post : T.tooltip_score;
 
   return (
     <Paper sx={{ height: "100%", display: "flex", flexDirection: "column", p: 1.5 }}>
@@ -62,6 +65,11 @@ export default function CandidatesPanel({
         <Stack direction="row" alignItems="center" spacing={1}>
             <Typography variant="h6">{title || STR[lang].panels.candidates}</Typography>
             <Chip label={`${rows?.length ?? 0} / ${totalTaxa}`} size="small" />
+            <FormControlLabel 
+                control={<Switch size="small" checked={showMatchSupport} onChange={e => setShowMatchSupport(e.target.checked)}/>}
+                label={<Typography variant="body2">{T.show_match_support}</Typography>}
+                sx={{ ml: 1 }}
+            />
         </Stack>
         <Button
             variant="outlined"
@@ -81,7 +89,7 @@ export default function CandidatesPanel({
               <TableCell padding="checkbox"></TableCell>
               <TableCell sx={{ width: 50 }}>{T.header_rank}</TableCell>
               <TableCell>{T.header_name}</TableCell>
-              <TableCell sx={{ width: 120 }}><Tooltip title={T.tooltip_post}><span>{T.header_post}</span></Tooltip></TableCell>
+              <TableCell sx={{ width: 120 }}><Tooltip title={scoreTooltip}><span>{scoreHeader}</span></Tooltip></TableCell>
               <TableCell sx={{ width: 80 }}><Tooltip title={T.tooltip_delta}><span>{T.header_delta}</span></Tooltip></TableCell>
               <TableCell sx={{ width: 70 }} align="center"><Tooltip title={T.tooltip_conflicts}><span>{T.header_conflicts}</span></Tooltip></TableCell>
               {showMatchSupport && <TableCell sx={{ width: 110 }}>{T.header_match_support}</TableCell>}

@@ -6,7 +6,8 @@ export type AlgoOptions = main.ApplyOptions & {
   gammaNAPenalty: number;
   epsilonCut:     number;
   conflictPenalty: number;
-  usePragmaticScore: boolean; // ✨ 追加
+  usePragmaticScore: boolean;
+  toleranceFactor: number; // Add this line
 };
 
 export const DEFAULT_OPTS: AlgoOptions = {
@@ -16,7 +17,8 @@ export const DEFAULT_OPTS: AlgoOptions = {
   kappa:          1.0,
   epsilonCut:     1e-6,
   conflictPenalty: 1.0,
-  usePragmaticScore: true, // ✨ デフォルトは有効
+  usePragmaticScore: true,
+  toleranceFactor: 0.1, // Add default value (e.g., 10%)
   wantInfoGain: false,
   lambda: 1.0, 
   a0: 1.0,
@@ -56,5 +58,6 @@ export function clampAlgoOptions(o: AlgoOptions): AlgoOptions {
     kappa:          clamp(o.kappa,          0, 5),
     epsilonCut:     clamp(o.epsilonCut,     1e-12, 1e-3),
     conflictPenalty: clamp(o.conflictPenalty, 0, 1),
+    toleranceFactor: clamp(o.toleranceFactor, 0, 0.5), // Add clamping for tolerance
   };
 }

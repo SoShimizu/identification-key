@@ -1,6 +1,12 @@
 // backend/engine/engine_types.go
 package engine
 
+// ContinuousValue represents a min-max range for a continuous trait.
+type ContinuousValue struct {
+	Min float64 `json:"min"`
+	Max float64 `json:"max"`
+}
+
 type Ternary int8
 
 const (
@@ -13,19 +19,24 @@ type Trait struct {
 	ID         string   `json:"id"`
 	Name       string   `json:"name"`
 	Group      string   `json:"group"`
-	Type       string   `json:"type"`
+	Type       string   `json:"type"` // "binary", "derived", "nominal_parent", "continuous"
 	Parent     string   `json:"parent,omitempty"`
 	State      string   `json:"state,omitempty"`
 	Difficulty float64  `json:"difficulty,omitempty"`
 	Risk       float64  `json:"risk,omitempty"`
-	HelpText   string   `json:"helpText,omitempty"`   // ✨ 追加
-	HelpImages []string `json:"helpImages,omitempty"` // ✨ 追加
+	HelpText   string   `json:"helpText,omitempty"`
+	HelpImages []string `json:"helpImages,omitempty"`
+	// For continuous traits
+	MinValue  float64 `json:"minValue,omitempty"`
+	MaxValue  float64 `json:"maxValue,omitempty"`
+	IsInteger bool    `json:"isInteger,omitempty"` // True if the trait only takes integer values
 }
 
 type Taxon struct {
-	ID     string             `json:"id"`
-	Name   string             `json:"name"`
-	Traits map[string]Ternary `json:"traits"`
+	ID               string                     `json:"id"`
+	Name             string                     `json:"name"`
+	Traits           map[string]Ternary         `json:"traits"`
+	ContinuousTraits map[string]ContinuousValue `json:"continuousTraits"`
 }
 
 type Matrix struct {
@@ -72,6 +83,8 @@ type AlgoOptions struct {
 	B0                float64 `json:"b0"`
 	Kappa             float64 `json:"kappa"`
 	ConflictPenalty   float64 `json:"conflictPenalty"`
+	// New field for continuous trait tolerance
+	ToleranceFactor float64 `json:"toleranceFactor"`
 }
 type EvalResult struct {
 	Scores      []TaxonScore      `json:"scores"`

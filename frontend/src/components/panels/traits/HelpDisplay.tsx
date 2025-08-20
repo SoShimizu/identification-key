@@ -4,9 +4,11 @@ import { Box, Typography, CircularProgress, Paper, Stack, Modal, IconButton } fr
 import CloseIcon from '@mui/icons-material/Close';
 import { Trait } from '../../../api';
 import { GetHelpImage } from '../../../../wailsjs/go/main/App';
+import { STR } from '../../../i18n';
 
 type Props = {
   trait?: Trait;
+  lang: "ja" | "en";
 };
 
 const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ filename, onClick }) => {
@@ -47,9 +49,10 @@ const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ 
     return null;
 };
 
-export default function HelpDisplay({ trait }: Props) {
+export default function HelpDisplay({ trait, lang }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImage, setModalImage] = useState<string | null>(null);
+  const T = STR[lang].panels;
 
   const handleImageClick = (filename: string) => {
     GetHelpImage(filename).then(base64Data => {
@@ -63,7 +66,7 @@ export default function HelpDisplay({ trait }: Props) {
   if (!trait) {
     return (
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
-        <Typography color="text.secondary">形質の行をクリックするとヘルプが表示されます</Typography>
+        <Typography color="text.secondary">{T.help_placeholder}</Typography>
       </Box>
     );
   }

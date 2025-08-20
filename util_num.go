@@ -17,3 +17,30 @@ func parseFloat(s string) (float64, bool) {
 	}
 	return v, true
 }
+
+// ✨ 新規追加: 範囲文字列をパースする
+func parseRange(s string) (min, max float64, ok bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, 0, false
+	}
+
+	parts := strings.Split(s, "-")
+	if len(parts) == 1 {
+		val, ok := parseFloat(s)
+		if !ok {
+			return 0, 0, false
+		}
+		return val, val, true
+	}
+
+	if len(parts) == 2 {
+		min, ok1 := parseFloat(parts[0])
+		max, ok2 := parseFloat(parts[1])
+		if ok1 && ok2 && min <= max {
+			return min, max, true
+		}
+	}
+
+	return 0, 0, false
+}

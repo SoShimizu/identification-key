@@ -17,14 +17,16 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "morpho-key",
-		Width:  1024,
-		Height: 768,
+		Title:  "ClavisID",
+		Width:  1280, // Increased default width
+		Height: 800,  // Increased default height
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.Startup,
+		StartHidden:      false,
+		WindowStartState: options.Maximised, // Start maximised (fullscreen)
 		Bind: []interface{}{
 			app,
 		},

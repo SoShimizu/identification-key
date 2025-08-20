@@ -13,21 +13,27 @@ const (
 	BayesTraitBinary BayesTraitKind = iota
 	BayesTraitNominal
 	BayesTraitOrdinal
+	BayesTraitContinuous // New kind for continuous traits
 )
 
 type BayesTruth struct {
-	Kind, K int
-	Unknown bool
-	States  []int
-	Weights []float64
+	Kind     BayesTraitKind
+	K        int
+	Unknown  bool
+	States   []int
+	Weights  []float64
+	Min, Max float64 // For continuous traits
 }
 type BayesObservation struct {
-	Kind, K int
-	IsNA    bool
-	State   int
-	Multi   []int
-	MultiW  []float64
+	Kind   BayesTraitKind
+	K      int
+	IsNA   bool
+	State  int
+	Multi  []int
+	MultiW []float64
+	Value  float64 // For continuous traits
 }
+
 type BayesTruthGetter func(taxonIdx int, traitID string) (BayesTruth, bool)
 type BayesObsGetter func(traitID string) (BayesObservation, bool)
 type BayesRanked struct {
@@ -36,6 +42,60 @@ type BayesRanked struct {
 }
 
 const largeNegativeLogLikelihood = -1e6 // Penalty base for conflicts
+
+// logProbContinuous calculates the log-likelihood for a continuous observation
+// based on a trapezoidal probability distribution derived from the taxon's min-max range.
+func logProbContinuous(obsValue float64, truthMin, truthMax float64, toleranceFactor float64) float64 {
+	truthRange := truthMax - truthMin
+
+	// Ensure toleranceFactor is within a reasonable range [0, 0.5] (0% to 50% of the range)
+	if toleranceFactor < 0 {
+		toleranceFactor = 0
+	}
+	if toleranceFactor > 0.5 {
+		toleranceFactor = 0.5
+	}
+
+	// Tolerance is a factor of the taxon's range.
+	// A minimum tolerance is set for single-value ranges to avoid division by zero.
+	tolerance := math.Max(truthRange*toleranceFactor, 0.05)
+
+	// If tolerance is effectively zero, use a strict in/out check.
+	if tolerance < 1e-9 {
+		if obsValue >= truthMin && obsValue <= truthMax {
+			return 0.0
+		}
+		return largeNegativeLogLikelihood
+	}
+
+	// Check if the observed value is within the core range [min, max]
+	if obsValue >= truthMin && obsValue <= truthMax {
+		// Inside the flat top of the trapezoid, probability is highest (and constant).
+		// Log-likelihood is 0, as this is the baseline.
+		return 0.0
+	}
+
+	// Check if the observed value is within the tolerance margins
+	if obsValue > truthMax && obsValue < truthMax+tolerance {
+		// On the right slope of the trapezoid.
+		// Likelihood decreases linearly from 1 to 0.
+		// We use a logarithmic penalty that grows as the value moves away from the range.
+		dist := obsValue - truthMax
+		penalty := (dist / tolerance) * 10 // Scaled penalty
+		return -penalty
+	}
+
+	if obsValue < truthMin && obsValue > truthMin-tolerance {
+		// On the left slope of the trapezoid.
+		dist := truthMin - obsValue
+		penalty := (dist / tolerance) * 10 // Scaled penalty
+		return -penalty
+	}
+
+	// Outside the range and tolerance margins.
+	// This is considered a strong conflict.
+	return largeNegativeLogLikelihood
+}
 
 // logProbBinary calculates the log probability, now with a robust, interpolated conflict penalty.
 func logProbBinary(obs int, truth int, alpha, beta, conflictPenaltyFactor float64) float64 {
@@ -138,6 +198,7 @@ type BayesEvalParams struct {
 	Kappa           float64
 	EpsilonCut      float64
 	ConflictPenalty float64
+	ToleranceFactor float64
 }
 
 func EvalBayesPosteriorGeneric(
@@ -164,7 +225,7 @@ func EvalBayesPosteriorGeneric(
 				continue
 			}
 
-			if obs.Kind == int(BayesTraitBinary) {
+			if obs.Kind == BayesTraitBinary {
 				if truth.Unknown {
 					var pr float64
 					if obs.State == 1 {
@@ -202,6 +263,12 @@ func EvalBayesPosteriorGeneric(
 					if weightSum > 0 {
 						lp += math.Log(pr / weightSum)
 					}
+				}
+			} else if obs.Kind == BayesTraitContinuous {
+				if truth.Unknown {
+					lp += math.Log(p.GammaNAPenalty)
+				} else {
+					lp += logProbContinuous(obs.Value, truth.Min, truth.Max, p.ToleranceFactor)
 				}
 			}
 		}
