@@ -14,6 +14,10 @@ export function GetCurrentKeyName() {
   return window['go']['main']['App']['GetCurrentKeyName']();
 }
 
+export function GetHelpImage(arg1) {
+  return window['go']['main']['App']['GetHelpImage'](arg1);
+}
+
 export function GetMatrix() {
   return window['go']['main']['App']['GetMatrix']();
 }

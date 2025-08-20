@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,7 +64,9 @@ func (a *App) GetMatrix() (*engine.Matrix, error) {
 			return nil, err
 		}
 		if len(list) == 0 {
-			return &engine.Matrix{}, nil
+			// フォルダは見つかったが、キーが一つもなかった場合
+			runtime.LogInfo(a.ctx, "No keys found in the keys directory.")
+			return &engine.Matrix{Name: "No keys found"}, nil // 空のMatrixを返してUIがクラッシュしないようにする
 		}
 		if err := a.setCurrentKeyByPath(list[0].Path); err != nil {
 			return nil, err
@@ -72,11 +75,21 @@ func (a *App) GetMatrix() (*engine.Matrix, error) {
 	return a.currentMatrix, nil
 }
 
-// ApplyFiltersAlgoOpt:
-//   - selected: 形質ID -> -1/0/1
-//   - mode: "lenient" | "strict"
-//   - algo: "bayes" | "heuristic"
-//   - options: 誤検出/見落とし/ハイパパラ/情報利得有無 など
+// GetHelpImage: ヘルプ画像を読み込んでBase64エンコードされた文字列として返す
+func (a *App) GetHelpImage(filename string) (string, error) {
+	// ✨ 起動時に設定したbasePathを基準にパスを構築
+	imgPath := filepath.Join(a.basePath, "help_materials", filename)
+
+	data, err := os.ReadFile(imgPath)
+	if err != nil {
+		runtime.LogError(a.ctx, fmt.Sprintf("Failed to read help image %s: %v", imgPath, err))
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(data), nil
+}
+
+// ApplyFiltersAlgoOpt
 func (a *App) ApplyFiltersAlgoOpt(
 	selected map[string]int,
 	mode string,
@@ -89,12 +102,11 @@ func (a *App) ApplyFiltersAlgoOpt(
 		}
 	}
 
-	// app 側オプション → engine 側オプションへ写し替え
 	eopts := engine.AlgoOptions{
 		DefaultAlphaFP:    opts.DefaultAlphaFP,
 		DefaultBetaFN:     opts.DefaultBetaFN,
 		WantInfoGain:      opts.WantInfoGain,
-		UsePragmaticScore: opts.UsePragmaticScore, // ✨ この行を追加して値を引き渡す
+		UsePragmaticScore: opts.UsePragmaticScore,
 		Lambda:            opts.Lambda,
 		A0:                opts.A0,
 		B0:                opts.B0,
@@ -102,7 +114,6 @@ func (a *App) ApplyFiltersAlgoOpt(
 		ConflictPenalty:   opts.ConflictPenalty,
 	}
 
-	// 新しいエンジンへ処理を委譲
 	res, err := engine.ApplyFiltersAlgoOpt(
 		a.currentMatrix,
 		selected,

@@ -1,25 +1,20 @@
 // frontend/src/components/header/Ribbon.tsx
 import React, { useState } from "react";
 import {
-  AppBar, Toolbar, Tabs, Tab, Box, Stack,
-  Select, MenuItem, FormControl, InputLabel, Switch,
-  IconButton, Tooltip, Collapse,
-  Typography
+  AppBar, Box, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, Stack, Switch, Tab, Tabs, Toolbar, Tooltip, Typography
 } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import TuneIcon from "@mui/icons-material/Tune";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SettingsIcon from '@mui/icons-material/Settings';
 import TranslateIcon from '@mui/icons-material/Translate';
-import MenuBookIcon from '@mui/icons-material/MenuBook'; // For Manual tab
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 
 import RibbonAlgoTab from "./RibbonAlgoTab";
 import RibbonOverviewTab from "./RibbonOverviewTab";
 import RibbonViewTab from "./RibbonViewTab";
 import RibbonManualTab from "./RibbonManualTab";
 import { STR } from "../../i18n";
-
-import type { LayoutState } from "../../App";
 
 type KeyInfoLike = { name: string; path?: string };
 
@@ -37,8 +32,6 @@ export type RibbonProps = {
   onHelp: () => void;
   themeMode: "dark" | "light";
   setThemeMode: (m: "dark" | "light") => void;
-  layout: LayoutState;
-  onLayoutChange: (v: LayoutState) => void;
   showMatchSupport: boolean;
   setShowMatchSupport: (b: boolean) => void;
   matrixName: string;
@@ -46,7 +39,7 @@ export type RibbonProps = {
   onApplied?: (res: any) => void;
 };
 
-type TabKey = "overview" | "algo" | "view" | "manual"; // "manual" を追加
+type TabKey = "overview" | "algo" | "view" | "manual";
 
 export default function Ribbon(props: RibbonProps) {
   const {
@@ -56,7 +49,6 @@ export default function Ribbon(props: RibbonProps) {
     algo, setAlgo,
     onHelp,
     themeMode, setThemeMode,
-    layout, onLayoutChange,
     showMatchSupport, setShowMatchSupport,
     matrixName, selected, onApplied,
   } = props;
@@ -116,7 +108,7 @@ export default function Ribbon(props: RibbonProps) {
         <Box sx={{ px: 2, py: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, bgcolor: 'background.default' }}>
           {tab === "overview" && <RibbonOverviewTab lang={lang} matrixName={matrixName} selected={selected} debugOpen={debugOpen} setDebugOpen={setDebugOpen} />}
           {tab === "algo" && <RibbonAlgoTab lang={lang} matrixName={matrixName} selected={selected} onApplied={onApplied} algorithm={algo} onAlgorithmChange={setAlgo} mode={mode} onModeChange={setMode} />}
-          {tab === "view" && <RibbonViewTab lang={lang} layout={layout} onLayoutChange={onLayoutChange} showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport} />}
+          {tab === "view" && <RibbonViewTab lang={lang} showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport} />}
           {tab === "manual" && <RibbonManualTab lang={lang} />}
         </Box>
       </Collapse>

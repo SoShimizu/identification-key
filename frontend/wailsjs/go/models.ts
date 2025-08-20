@@ -25,6 +25,8 @@ export namespace engine {
 	    state?: string;
 	    difficulty?: number;
 	    risk?: number;
+	    helpText?: string;
+	    helpImages?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Trait(source);
@@ -40,6 +42,8 @@ export namespace engine {
 	        this.state = source["state"];
 	        this.difficulty = source["difficulty"];
 	        this.risk = source["risk"];
+	        this.helpText = source["helpText"];
+	        this.helpImages = source["helpImages"];
 	    }
 	}
 	export class Matrix {

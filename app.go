@@ -18,6 +18,9 @@ import (
 type App struct {
 	ctx context.Context
 
+	// ✨ アプリケーションの基準パス（実行可能ファイルの場所）
+	basePath string
+
 	// Keys dir & current selection
 	keysDir       string
 	currentKey    string
@@ -27,14 +30,27 @@ type App struct {
 
 // NewApp provides an instance
 func NewApp() *App {
-	return &App{
-		keysDir: "keys", // ルート直下 keys/ に置く。必要ならここを変更
-	}
+	return &App{}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	runtime.LogInfo(a.ctx, "[startup] backend starting")
+
+	// ✨ 実行可能ファイルのパスを取得
+	exePath, err := os.Executable()
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "Failed to get executable path: %v", err)
+		a.basePath = "." // フォールバック
+	} else {
+		a.basePath = filepath.Dir(exePath)
+	}
+	runtime.LogInfof(a.ctx, "Base path set to: %s", a.basePath)
+
+	// keysDirを絶対パスで設定
+	a.keysDir = filepath.Join(a.basePath, "keys")
+	runtime.LogInfof(a.ctx, "Keys directory set to: %s", a.keysDir)
+
 	_ = os.MkdirAll(a.keysDir, 0o755)
 }
 
@@ -60,7 +76,7 @@ func (a *App) listXLSX() ([]KeyInfo, error) {
 	var items []KeyInfo
 	entries, err := os.ReadDir(a.keysDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read keys directory %s: %w", a.keysDir, err)
 	}
 	for _, e := range entries {
 		if e.IsDir() {
@@ -69,13 +85,14 @@ func (a *App) listXLSX() ([]KeyInfo, error) {
 		if filepath.Ext(e.Name()) != ".xlsx" {
 			continue
 		}
-		fi, err := os.Stat(filepath.Join(a.keysDir, e.Name()))
+		fullPath := filepath.Join(a.keysDir, e.Name())
+		fi, err := os.Stat(fullPath)
 		if err != nil {
 			continue
 		}
 		items = append(items, KeyInfo{
 			Name:    e.Name(),
-			Path:    filepath.Join(a.keysDir, e.Name()),
+			Path:    fullPath,
 			Size:    fi.Size(),
 			Ext:     filepath.Ext(e.Name()),
 			ModTime: fi.ModTime().Format(time.RFC3339),

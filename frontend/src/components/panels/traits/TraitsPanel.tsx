@@ -2,8 +2,9 @@
 import React, { useMemo } from "react";
 import {
   Paper, Box, Typography, Stack, Button, ButtonGroup, Chip, Table, TableHead,
-  TableRow, TableCell, TableBody, TableContainer, Tooltip, FormControlLabel, Switch
+  TableRow, TableCell, TableBody, TableContainer, Tooltip, FormControlLabel, Switch, IconButton
 } from "@mui/material";
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { STR } from "../../../i18n";
 import { Trait, TraitSuggestion } from "../../../api";
 import { AlgoOptions } from "../../../hooks/useAlgoOpts";
@@ -11,7 +12,7 @@ import { AlgoOptions } from "../../../hooks/useAlgoOpts";
 type Choice = -1 | 0 | 1;
 
 export type TraitRow =
-  | { group: string; traitName: string; type: "binary"; binary: { id: string, parent?: string } }
+  | { group: string; traitName: string; type: "binary"; binary: Trait }
   | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[], parent?: string };
 
 type Props = {
@@ -26,12 +27,12 @@ type Props = {
   setSortBy: React.Dispatch<React.SetStateAction<"recommend" | "group" | "name">>;
   suggMap: Record<string, TraitSuggestion>;
   suggRank?: Record<string, number>;
-  opts: AlgoOptions; // ✨ propsを追加
-  setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>; // ✨ propsを追加
+  opts: AlgoOptions;
+  setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>;
+  onTraitSelect: (trait: Trait) => void;
   lang?: "ja" | "en";
 };
 
-// ... (getRowSuggestion, rowRank, ScoreBar, RowRenderer functions remain the same)
 function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion>): TraitSuggestion | undefined {
     if (row.type === "binary") {
         return suggMap[row.binary.id];
@@ -45,11 +46,13 @@ function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion
     }
     return parentSugg;
 }
+  
 function rowRank(row: TraitRow, rankMap?: Record<string, number>, suggMap?: Record<string, TraitSuggestion>): number | undefined {
     if (!rankMap) return undefined;
     const suggestion = getRowSuggestion(row, suggMap || {});
     return suggestion ? rankMap[suggestion.traitId] : undefined;
 }
+
 const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) => {
     if (!suggestion || !(suggestion.score > 0)) return null;
     const normalizedScore = suggestion.ig > 0 ? (suggestion.score / suggestion.ig) : 0;
@@ -64,7 +67,8 @@ const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) =
       </Tooltip>
     );
 });
-const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearDerived, rank, suggestion, parentInfo, lang = "ja" }: {
+
+const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearDerived, rank, suggestion, parentInfo, onTraitSelect, lang = "ja" }: {
   r: TraitRow;
   selected: Record<string, number>;
   setBinary: Props["setBinary"];
@@ -73,10 +77,20 @@ const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearD
   rank?: number;
   suggestion?: TraitSuggestion;
   parentInfo: { isDisabled: boolean, reason: string };
+  onTraitSelect: (trait: Trait) => void;
   lang?: "ja" | "en";
 }) => {
-  const T = STR[lang];
+  const T = STR[lang].traitsPanel;
   const chosenId = r.type === 'derived' ? r.children.find(c => selected[c.id] === 1)?.id : undefined;
+
+  const getTraitObject = (): Trait | undefined => {
+      if (r.type === 'binary') return r.binary;
+      // For derived traits, find the parent trait object from the suggestion
+      if (suggestion) {
+          return suggestion as unknown as Trait; // It has the core fields
+      }
+      return undefined;
+  }
 
   return (
     <TableRow hover sx={{ opacity: parentInfo.isDisabled ? 0.5 : 1 }}>
@@ -86,22 +100,32 @@ const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearD
         <ScoreBar suggestion={suggestion} />
       </TableCell>
       <TableCell>{r.group}</TableCell>
-      <TableCell><Typography variant="body2">{r.traitName}</Typography></TableCell>
+      <TableCell>
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography variant="body2">{r.traitName}</Typography>
+            <IconButton size="small" onClick={() => {
+                const traitObj = getTraitObject();
+                if(traitObj) onTraitSelect(traitObj)
+            }}>
+                <HelpOutlineIcon fontSize="inherit" />
+            </IconButton>
+        </Stack>
+      </TableCell>
       <TableCell>
         <Tooltip title={parentInfo.reason} placement="top-start">
             <Box>
                 {r.type === "binary" ? (
                      <ButtonGroup variant="outlined" size="small" disabled={parentInfo.isDisabled}>
-                        <Button variant={selected[r.binary.id] === 1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>{T.traitsPanel.state_yes}</Button>
-                        <Button variant={selected[r.binary.id] === -1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>{T.traitsPanel.state_no}</Button>
-                        <Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.traitsPanel.state_clear}</Button>
+                        <Button variant={selected[r.binary.id] === 1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>{T.state_yes}</Button>
+                        <Button variant={selected[r.binary.id] === -1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>{T.state_no}</Button>
+                        <Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.state_clear}</Button>
                     </ButtonGroup>
                 ) : (
                     <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
                         {r.children.map(c => (
                             <Button key={c.id} size="small" variant={chosenId === c.id ? 'contained' : 'outlined'} onClick={() => setDerivedPick(r.children.map(x => x.id), c.id, r.traitName)}>{c.label}</Button>
                         ))}
-                        <Button size="small" variant="outlined" onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>{T.traitsPanel.state_clear}</Button>
+                        <Button size="small" variant="outlined" onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>{T.state_clear}</Button>
                     </Stack>
                 )}
             </Box>
@@ -113,7 +137,7 @@ const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearD
 
 
 export default function TraitsPanel(props: Props) {
-  const { title, mode, rows, selected, setBinary, setDerivedPick, clearDerived, sortBy, setSortBy, suggMap, opts, setOpts, lang = "ja" } = props;
+  const { title, mode, rows, selected, setBinary, setDerivedPick, clearDerived, sortBy, setSortBy, suggMap, opts, setOpts, onTraitSelect, lang = "ja" } = props;
   const T = STR[lang].traitsPanel;
   
   const handleBool = (key: keyof AlgoOptions) => (_: any, checked: boolean) => {
@@ -158,13 +182,12 @@ export default function TraitsPanel(props: Props) {
     return rank;
   }, [filteredAndSortedRows, sortBy, suggMap]);
 
-
+  // ✨ This is the missing part
   return (
     <Paper sx={{ p: 1.5, display: "flex", flexDirection: "column", height: "100%" }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1, px: 0.5, flexWrap: 'wrap' }}>
         <Typography variant="h6">{title}</Typography>
         <Stack direction="row" alignItems="center" spacing={1}>
-            {/* ✨ スイッチをここに移動 */}
             {sortBy === 'recommend' && mode === 'unselected' && (
                 <FormControlLabel 
                     control={<Switch size="small" checked={opts.usePragmaticScore} onChange={handleBool("usePragmaticScore")} />} 
@@ -205,6 +228,7 @@ export default function TraitsPanel(props: Props) {
                 suggestion={suggestion}
                 lang={lang}
                 parentInfo={parentInfo}
+                onTraitSelect={onTraitSelect}
               />);
             })}
           </TableBody>

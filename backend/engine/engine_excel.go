@@ -51,24 +51,22 @@ func parseTernaryCell(s string) Ternary {
 	}
 }
 
-// 観察難易度（Difficulty）を単語から数値コストに変換する
 func parseDifficulty(s string) float64 {
 	s = strings.ToLower(strings.TrimSpace(s))
 	switch s {
 	case "easy":
 		return 0.5
-	case "normal", "": // 空欄はNormalとして扱う
+	case "normal", "":
 		return 1.0
 	case "hard":
 		return 2.0
 	case "very hard":
 		return 3.0
 	default:
-		// 数値での直接指定も可能
 		if v, err := strconv.ParseFloat(s, 64); err == nil && v > 0 {
 			return v
 		}
-		return 1.0 // 不明な単語はNormalとして扱う
+		return 1.0
 	}
 }
 
@@ -106,8 +104,6 @@ func getCell(rows [][]string, r, c int) string {
 	return strings.TrimSpace(rows[r][c])
 }
 
-// ... (typeSpec and related functions remain the same)
-
 type traitKind int
 
 const (
@@ -125,7 +121,6 @@ type typeSpec struct {
 }
 
 func parseStateList(s string) []string {
-	// ... (no changes here)
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
 		s = strings.TrimSpace(s[1 : len(s)-1])
@@ -141,8 +136,8 @@ func parseStateList(s string) []string {
 	}
 	return out
 }
+
 func parseStateListOrdered(s string) []string {
-	// ... (no changes here)
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
 		s = strings.TrimSpace(s[1 : len(s)-1])
@@ -158,8 +153,8 @@ func parseStateListOrdered(s string) []string {
 	}
 	return out
 }
+
 func parseTypeSpec(s string) typeSpec {
-	// ... (no changes here)
 	x := strings.ToLower(strings.TrimSpace(s))
 	if x == "" || x == "binary" {
 		return typeSpec{kind: kindBinary}
@@ -203,8 +198,8 @@ func parseTypeSpec(s string) typeSpec {
 	}
 	return typeSpec{kind: kindBinary}
 }
+
 func binLabel(a, b float64, last bool) string {
-	// ... (no changes here)
 	if last {
 		return fmt.Sprintf("[%.4g～%.4g]", a, b)
 	}
@@ -228,7 +223,12 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	}
 
 	header := rows[0]
-	colIdxGroup, colIdxTrait, colIdxType, colIdxDifficulty, colIdxRisk, colIdxParent := -1, -1, -1, -1, -1, -1
+	// ✨ BOM対策: 最初のヘッダーからBOMをトリムする
+	if len(header) > 0 {
+		header[0] = strings.TrimPrefix(header[0], "\ufeff")
+	}
+
+	colIdxGroup, colIdxTrait, colIdxType, colIdxDifficulty, colIdxRisk, colIdxParent, colIdxHelpText, colIdxHelpImage := -1, -1, -1, -1, -1, -1, -1, -1
 
 	taxonNames := []string{}
 	taxonCols := []int{}
@@ -243,12 +243,16 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				colIdxTrait = i
 			case "#type":
 				colIdxType = i
-			case "#difficulty": // #Costから#Difficultyに変更
+			case "#difficulty":
 				colIdxDifficulty = i
 			case "#risk":
 				colIdxRisk = i
 			case "#parent":
 				colIdxParent = i
+			case "#helptext":
+				colIdxHelpText = i
+			case "#helpimage":
+				colIdxHelpImage = i
 			}
 		} else if cleanHeader != "" {
 			taxonNames = append(taxonNames, strings.TrimSpace(h))
@@ -282,8 +286,18 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 
 		difficultyVal := parseDifficulty(getCell(rows, r, colIdxDifficulty))
 		riskVal := parseRisk(getCell(rows, r, colIdxRisk))
-
 		parentName := getCell(rows, r, colIdxParent)
+		helpText := getCell(rows, r, colIdxHelpText)
+		helpImageStr := getCell(rows, r, colIdxHelpImage)
+		var helpImages []string
+		if helpImageStr != "" {
+			parts := regexp.MustCompile(`[ ,;]+`).Split(helpImageStr, -1)
+			for _, part := range parts {
+				if part != "" {
+					helpImages = append(helpImages, part)
+				}
+			}
+		}
 
 		switch spec.kind {
 		case kindBinary:
@@ -296,6 +310,8 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				Difficulty: difficultyVal,
 				Risk:       riskVal,
 				Parent:     parentName,
+				HelpText:   helpText,
+				HelpImages: helpImages,
 			})
 			for i, col := range taxonCols {
 				valStr := getCell(rows, r, col)
@@ -305,7 +321,6 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindNominal, kindOrdinal:
-			// ... (rest of the code for nominal/ordinal, ensuring Difficulty and Risk are passed to new Traits)
 			states := spec.states
 			if len(states) == 0 {
 				uniq := map[string]struct{}{}
@@ -326,7 +341,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 			parentTraitID := fmt.Sprintf("t%04d_parent", len(m.Traits)+1)
-			m.Traits = append(m.Traits, Trait{ID: parentTraitID, Name: traitName, Group: group, Type: "nominal_parent", Difficulty: difficultyVal, Risk: riskVal})
+			m.Traits = append(m.Traits, Trait{ID: parentTraitID, Name: traitName, Group: group, Type: "nominal_parent", Difficulty: difficultyVal, Risk: riskVal, HelpText: helpText, HelpImages: helpImages})
 
 			derivedIDs := make([]string, len(states))
 			for i, st := range states {
@@ -368,7 +383,6 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindContinuous:
-			// ... (rest of the code for continuous, ensuring Difficulty and Risk are passed to new Traits)
 			values := make([]float64, len(taxonCols))
 			have := make([]bool, len(taxonCols))
 			minv, maxv := math.Inf(1), math.Inf(-1)

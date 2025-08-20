@@ -9,6 +9,8 @@ export function EnsureMyKeysAndSamples():Promise<void>;
 
 export function GetCurrentKeyName():Promise<string>;
 
+export function GetHelpImage(arg1:string):Promise<string>;
+
 export function GetMatrix():Promise<engine.Matrix>;
 
 export function ListMyKeys():Promise<Array<main.KeyInfo>>;

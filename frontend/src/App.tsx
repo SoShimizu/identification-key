@@ -1,68 +1,55 @@
 // frontend/src/App.tsx
 import React from "react";
-import { CssBaseline, ThemeProvider, createTheme, Box } from "@mui/material";
+import { CssBaseline, ThemeProvider, createTheme, Box, Drawer } from "@mui/material";
 import { useMatrix } from "./hooks/useMatrix";
 import Ribbon from "./components/header/Ribbon";
-import TraitsPanel from "./components/panels/traits/TraitsPanel";
-import HistoryPanel from "./components/panels/history/HistoryPanel";
 import CandidatesPanel, { EngineScore } from "./components/panels/candidates/CandidatesPanel";
+import ComparisonPanel from "./components/panels/comparison/ComparisonPanel";
+import TraitsTabsPanel from "./components/panels/traits/TraitsTabsPanel";
 import { STR } from "./i18n";
-import { Choice } from "./api";
+import { Choice, Taxon } from "./api";
 
 const fontLink = document.createElement('link');
 fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
 fontLink.rel = 'stylesheet';
 document.head.appendChild(fontLink);
 
-export type PanelKey = "candidates" | "traits_unselected" | "traits_selected" | "history";
-export type LayoutState = { tl: PanelKey; tr: PanelKey; bl: PanelKey; br: PanelKey };
-
-const DEFAULT_LAYOUT: LayoutState = {
-  tl: "candidates",
-  tr: "traits_unselected",
-  bl: "history",
-  br: "traits_selected",
-};
-
-function loadLayout(): LayoutState {
-  try {
-    const s = localStorage.getItem("mk.layout.v2");
-    return s ? { ...DEFAULT_LAYOUT, ...JSON.parse(s) } : DEFAULT_LAYOUT;
-  } catch {
-    return DEFAULT_LAYOUT;
-  }
-}
-function saveLayout(v: LayoutState) {
-  localStorage.setItem("mk.layout.v2", JSON.stringify(v));
-}
-
 export default function App() {
   const {
-    matrixName, taxaCount, rows,
+    matrixName, taxaCount, rows, traits,
     selected, setBinary, setDerivedPick, clearDerived,
     scores, suggMap, sortBy, setSortBy,
     mode, setMode,
     algo, setAlgo,
-    opts, setOpts, // ✨ optsとsetOptsを受け取る
+    opts, setOpts,
     keys, activeKey, pickKey, refreshKeys,
-    history,
+    history, // ✨ historyを受け取る
   } = useMatrix();
 
   const [themeMode, setThemeMode] = React.useState<"light" | "dark">("dark");
-  const [layout, setLayout] = React.useState<LayoutState>(() => loadLayout());
   const [showMatchSupport, setShowMatchSupport] = React.useState<boolean>(false);
   const [lang, setLang] = React.useState<"ja" | "en">("ja");
+  const [comparisonList, setComparisonList] = React.useState<string[]>([]);
+  const [comparisonOpen, setComparisonOpen] = React.useState(false);
+  
+  const allTaxa = React.useMemo(() => {
+    const matrixTaxa = scores.map(s => s.taxon);
+    return matrixTaxa as Taxon[];
+  }, [scores]);
 
   const T = STR[lang];
 
+  // ✨ テーマ定義をより具体的に修正
   const theme = React.useMemo(
     () => createTheme({
       palette: {
         mode: themeMode,
         ...(themeMode === 'dark' ? {
           background: { default: '#0c111c', paper: '#1f2937' },
+          text: { primary: '#e7f0f8', secondary: '#9fb4c7' },
         } : {
           background: { default: '#f8f9fa', paper: '#ffffff' },
+          text: { primary: '#212529', secondary: '#6c757d' },
         })
       },
       typography: {
@@ -103,35 +90,6 @@ export default function App() {
     }));
   }, [scores]);
 
-  const renderPanel = (k: PanelKey) => {
-    switch (k) {
-      case "candidates":
-        return <CandidatesPanel lang={lang} title={T.panels.candidates} rows={candRows} totalTaxa={taxaCount || 0} showMatchSupport={showMatchSupport} />;
-      case "history":
-        return <HistoryPanel title={T.panels.history} items={history as any} />;
-      case "traits_unselected":
-      case "traits_selected":
-        return (
-          <TraitsPanel
-            lang={lang}
-            title={k === "traits_unselected" ? T.panels.traits_unselected : T.panels.traits_selected}
-            mode={k === "traits_unselected" ? "unselected" : "selected"}
-            rows={rows}
-            selected={selected as Record<string, number>}
-            setBinary={(id, val, label) => setBinary(id, val as Choice, label)}
-            setDerivedPick={setDerivedPick}
-            clearDerived={clearDerived}
-            sortBy={sortBy}
-            setSortBy={setSortBy}
-            suggMap={suggMap}
-            suggRank={suggRank}
-            opts={opts} // ✨ propsとして渡す
-            setOpts={setOpts} // ✨ propsとして渡す
-          />
-        );
-    }
-  };
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -145,7 +103,6 @@ export default function App() {
           setMode={setMode}
           algo={algo} setAlgo={setAlgo}
           themeMode={themeMode} setThemeMode={setThemeMode}
-          layout={layout} onLayoutChange={(v) => { setLayout(v); saveLayout(v); }}
           showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport}
           onHelp={() => alert("Help is coming soon…")}
         />
@@ -154,17 +111,54 @@ export default function App() {
             flex: 1,
             p: 2,
             gap: 2,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gridTemplateRows: "1fr 1fr",
-            height: "calc(100vh - 48px)",
+            display: 'flex',
+            flexDirection: 'column',
+            height: 'calc(100vh - 48px)',
           }}
         >
-          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.tl)}</Box>
-          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.tr)}</Box>
-          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.bl)}</Box>
-          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.br)}</Box>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <CandidatesPanel
+              lang={lang}
+              title={T.panels.candidates}
+              rows={candRows}
+              totalTaxa={taxaCount || 0}
+              showMatchSupport={showMatchSupport}
+              comparisonList={comparisonList}
+              setComparisonList={setComparisonList}
+              onCompareClick={() => setComparisonOpen(true)}
+            />
+          </Box>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+             <TraitsTabsPanel
+                lang={lang}
+                rows={rows}
+                selected={selected as Record<string, number>}
+                setBinary={(id, val, label) => setBinary(id, val as Choice, label)}
+                setDerivedPick={setDerivedPick}
+                clearDerived={clearDerived}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                suggMap={suggMap}
+                suggRank={suggRank}
+                opts={opts}
+                setOpts={setOpts}
+             />
+          </Box>
         </Box>
+        <Drawer
+            anchor="bottom"
+            open={comparisonOpen}
+            onClose={() => setComparisonOpen(false)}
+            PaperProps={{ sx: { height: '60vh' } }}
+        >
+            <ComparisonPanel
+                lang={lang}
+                allTraits={traits}
+                allTaxa={allTaxa}
+                comparisonList={comparisonList}
+                onClose={() => setComparisonOpen(false)}
+            />
+        </Drawer>
       </Box>
     </ThemeProvider>
   );
