@@ -4,8 +4,8 @@ import { EnsureMyKeysAndSamples, ListMyKeys, GetCurrentKeyName, PickKey } from "
 import { applyFilters } from "../utils/applyFilters";
 import { Matrix, TaxonScore, Trait, TraitSuggestion, Choice } from "../api";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
-// Import the unified AlgoOptions type
 import { useAlgoOpts, AlgoOptions } from "./useAlgoOpts";
+import { TraitRow } from "../components/panels/traits/TraitsPanel";
 
 function useDebouncedCallback<T extends any[]>(fn: (...args: T) => void, delay: number) {
   const ref = useRef<number | undefined>(undefined);
@@ -17,11 +17,6 @@ function useDebouncedCallback<T extends any[]>(fn: (...args: T) => void, delay: 
 
 export type KeyInfo = { name: string; path?: string };
 
-export type TraitRow =
-  | { group: string; traitName: string; type: "binary"; binary: Trait }
-  | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[], parent?: string };
-
-// Explicitly define the return type for the hook
 type UseMatrixReturn = {
     rows: TraitRow[];
     traits: Trait[];
@@ -35,7 +30,6 @@ type UseMatrixReturn = {
     setMode: (newMode: "strict" | "lenient") => void;
     algo: "bayes" | "heuristic";
     setAlgo: Dispatch<SetStateAction<"bayes" | "heuristic">>;
-    // Use the unified AlgoOptions type here
     opts: AlgoOptions;
     setOpts: Dispatch<SetStateAction<AlgoOptions>>;
     scores: TaxonScore[];
@@ -118,14 +112,13 @@ export function useMatrix(): UseMatrixReturn {
 
   // === Matrix Loading ===
   const loadMatrix = useCallback(async () => {
-    try { // ✨ エラーハンドリングを追加
+    try {
       const m: Matrix = await (window as any).go.main.App.GetMatrix();
       setTraits(m.traits ?? []);
       setTaxaCount(m.taxa?.length ?? 0);
       setMatrixName(m.name ?? "");
     } catch(err) {
       console.error("Failed to load matrix:", err);
-      // エラーが発生した場合、stateを空にする
       setTraits([]);
       setTaxaCount(0);
       setMatrixName("Error loading matrix");
@@ -191,13 +184,14 @@ export function useMatrix(): UseMatrixReturn {
     return m;
   }, [suggs]);
 
-  const rowsUI = useMemo(() => {
+  const rows: TraitRow[] = useMemo(() => {
     const byParent: Record<string, Trait[]> = {};
     const parents: Record<string, Trait> = {};
     const binaryTraits: Trait[] = [];
 
     for (const t of traits) {
-        if (t.type === 'nominal_parent') {
+        // ✨ 修正: `continuous_parent` も親形質として正しく認識させる
+        if (t.type === 'nominal_parent' || t.type === 'continuous_parent') {
             parents[t.name] = t;
         } else if (t.type === 'derived' && t.parent) {
             if (!byParent[t.parent]) byParent[t.parent] = [];
@@ -209,12 +203,13 @@ export function useMatrix(): UseMatrixReturn {
 
     const out: TraitRow[] = [];
     for (const parentName in byParent) {
-        if (parents[parentName] && byParent[parentName]) {
+        const parentTrait = parents[parentName];
+        if (parentTrait && byParent[parentName]) {
             out.push({
-                group: parents[parentName].group || "",
+                group: parentTrait.group || "",
                 traitName: parentName,
                 type: "derived",
-                parent: parents[parentName].parent,
+                parentTrait: parentTrait, 
                 children: byParent[parentName].map(c => ({ id: c.id, label: c.state || c.name })),
             });
         }
@@ -227,7 +222,7 @@ export function useMatrix(): UseMatrixReturn {
   }, [traits]);
   
   return {
-    rows: rowsUI, traits, matrixName, taxaCount,
+    rows, traits, matrixName, taxaCount,
     selected, setBinary, setDerivedPick, clearDerived,
     mode, setMode, algo, setAlgo, opts, setOpts,
     scores, suggs, suggMap, sortBy, setSortBy, suggAlgo, setSuggAlgo,

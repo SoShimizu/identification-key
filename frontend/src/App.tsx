@@ -23,7 +23,7 @@ export default function App() {
     algo, setAlgo,
     opts, setOpts,
     keys, activeKey, pickKey, refreshKeys,
-    history, // ✨ historyを受け取る
+    history,
   } = useMatrix();
 
   const [themeMode, setThemeMode] = React.useState<"light" | "dark">("dark");
@@ -39,7 +39,6 @@ export default function App() {
 
   const T = STR[lang];
 
-  // ✨ テーマ定義をより具体的に修正
   const theme = React.useMemo(
     () => createTheme({
       palette: {
@@ -116,7 +115,8 @@ export default function App() {
             height: 'calc(100vh - 48px)',
           }}
         >
-          <Box sx={{ flex: 1, minHeight: 0 }}>
+          {/* ✨ 修正: flexの比率を調整 */}
+          <Box sx={{ flex: 2, minHeight: 0 }}>
             <CandidatesPanel
               lang={lang}
               title={T.panels.candidates}
@@ -128,7 +128,8 @@ export default function App() {
               onCompareClick={() => setComparisonOpen(true)}
             />
           </Box>
-          <Box sx={{ flex: 1, minHeight: 0 }}>
+          {/* ✨ 修正: flexの比率を調整 */}
+          <Box sx={{ flex: 3, minHeight: 0 }}>
              <TraitsTabsPanel
                 lang={lang}
                 rows={rows}

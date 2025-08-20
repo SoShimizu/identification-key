@@ -223,7 +223,6 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	}
 
 	header := rows[0]
-	// ✨ BOM対策: 最初のヘッダーからBOMをトリムする
 	if len(header) > 0 {
 		header[0] = strings.TrimPrefix(header[0], "\ufeff")
 	}
@@ -251,7 +250,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				colIdxParent = i
 			case "#helptext":
 				colIdxHelpText = i
-			case "#helpimage":
+			case "#helpimages": // ✨修正: ヘッダー名を複数形に
 				colIdxHelpImage = i
 			}
 		} else if cleanHeader != "" {
@@ -356,6 +355,8 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					State:      st,
 					Difficulty: difficultyVal,
 					Risk:       riskVal,
+					HelpText:   helpText,   // ✨修正: 親のヘルプ情報を継承
+					HelpImages: helpImages, // ✨修正: 親のヘルプ情報を継承
 				})
 			}
 			for i, col := range taxonCols {
@@ -414,6 +415,9 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				edges[i] = min + (max-min)*float64(i)/float64(bins)
 			}
 
+			parentTraitID := fmt.Sprintf("t%04d_parent", len(m.Traits)+1)
+			m.Traits = append(m.Traits, Trait{ID: parentTraitID, Name: traitName, Group: group, Type: "continuous_parent", Difficulty: difficultyVal, Risk: riskVal, HelpText: helpText, HelpImages: helpImages})
+
 			derivedIDs := make([]string, bins)
 			for i := 0; i < bins; i++ {
 				tid := fmt.Sprintf("t%04d", len(m.Traits)+1)
@@ -428,6 +432,8 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					State:      label,
 					Difficulty: difficultyVal,
 					Risk:       riskVal,
+					HelpText:   helpText,   // ✨修正: 親のヘルプ情報を継承
+					HelpImages: helpImages, // ✨修正: 親のヘルプ情報を継承
 				})
 			}
 			for i := range taxonCols {

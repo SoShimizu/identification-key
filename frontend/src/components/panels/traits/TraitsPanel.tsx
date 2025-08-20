@@ -2,21 +2,20 @@
 import React, { useMemo } from "react";
 import {
   Paper, Box, Typography, Stack, Button, ButtonGroup, Chip, Table, TableHead,
-  TableRow, TableCell, TableBody, TableContainer, Tooltip, FormControlLabel, Switch, IconButton
+  TableRow, TableCell, TableContainer, Tooltip,
+  TableBody
 } from "@mui/material";
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ImageIcon from '@mui/icons-material/Image';
 import { STR } from "../../../i18n";
 import { Trait, TraitSuggestion } from "../../../api";
 import { AlgoOptions } from "../../../hooks/useAlgoOpts";
 
-type Choice = -1 | 0 | 1;
-
 export type TraitRow =
   | { group: string; traitName: string; type: "binary"; binary: Trait }
-  | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[], parent?: string };
+  | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[]; parentTrait: Trait };
 
 type Props = {
-  title?: string;
   mode: "unselected" | "selected";
   rows: TraitRow[];
   selected: Record<string, number>;
@@ -24,35 +23,24 @@ type Props = {
   setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
   clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
   sortBy: "recommend" | "group" | "name";
-  setSortBy: React.Dispatch<React.SetStateAction<"recommend" | "group" | "name">>;
   suggMap: Record<string, TraitSuggestion>;
-  suggRank?: Record<string, number>;
-  opts: AlgoOptions;
-  setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>;
-  onTraitSelect: (trait: Trait) => void;
+  onTraitSelect: (trait?: Trait) => void;
   lang?: "ja" | "en";
+  // 親から移動してきたため不要になるProps
+  // title?: string;
+  // setSortBy: React.Dispatch<React.SetStateAction<"recommend" | "group" | "name">>;
+  // suggRank?: Record<string, number>;
+  // opts: AlgoOptions;
+  // setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>;
 };
 
 function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion>): TraitSuggestion | undefined {
     if (row.type === "binary") {
         return suggMap[row.binary.id];
     }
-    let parentSugg: TraitSuggestion | undefined;
-    for (const sugg of Object.values(suggMap)) {
-        if (sugg.name === row.traitName && sugg.group === row.group) {
-            parentSugg = sugg;
-            break;
-        }
-    }
-    return parentSugg;
+    return suggMap[row.parentTrait.id];
 }
   
-function rowRank(row: TraitRow, rankMap?: Record<string, number>, suggMap?: Record<string, TraitSuggestion>): number | undefined {
-    if (!rankMap) return undefined;
-    const suggestion = getRowSuggestion(row, suggMap || {});
-    return suggestion ? rankMap[suggestion.traitId] : undefined;
-}
-
 const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) => {
     if (!suggestion || !(suggestion.score > 0)) return null;
     const normalizedScore = suggestion.ig > 0 ? (suggestion.score / suggestion.ig) : 0;
@@ -68,7 +56,7 @@ const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) =
     );
 });
 
-const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearDerived, rank, suggestion, parentInfo, onTraitSelect, lang = "ja" }: {
+const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearDerived, rank, suggestion, onTraitSelect, lang = "ja" }: {
   r: TraitRow;
   selected: Record<string, number>;
   setBinary: Props["setBinary"];
@@ -76,74 +64,54 @@ const RowRenderer = React.memo(({ r, selected, setBinary, setDerivedPick, clearD
   clearDerived: Props["clearDerived"];
   rank?: number;
   suggestion?: TraitSuggestion;
-  parentInfo: { isDisabled: boolean, reason: string };
-  onTraitSelect: (trait: Trait) => void;
+  onTraitSelect: (trait?: Trait) => void;
   lang?: "ja" | "en";
 }) => {
   const T = STR[lang].traitsPanel;
   const chosenId = r.type === 'derived' ? r.children.find(c => selected[c.id] === 1)?.id : undefined;
+  const traitObject = r.type === 'binary' ? r.binary : r.parentTrait;
 
-  const getTraitObject = (): Trait | undefined => {
-      if (r.type === 'binary') return r.binary;
-      // For derived traits, find the parent trait object from the suggestion
-      if (suggestion) {
-          return suggestion as unknown as Trait; // It has the core fields
-      }
-      return undefined;
-  }
+  const hasHelpText = traitObject.helpText && traitObject.helpText.trim() !== "";
+  const hasHelpImages = traitObject.helpImages && traitObject.helpImages.length > 0;
 
   return (
-    <TableRow hover sx={{ opacity: parentInfo.isDisabled ? 0.5 : 1 }}>
+    <TableRow hover onClick={() => onTraitSelect(traitObject)} sx={{ cursor: 'pointer' }}>
       <TableCell align="center">{typeof rank === "number" ? <Chip size="small" label={`#${rank}`} /> : "—"}</TableCell>
       <TableCell>
         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{suggestion ? suggestion.score.toFixed(3) : "—"}</Typography>
         <ScoreBar suggestion={suggestion} />
       </TableCell>
       <TableCell>{r.group}</TableCell>
+      <TableCell>{r.traitName}</TableCell>
       <TableCell>
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-            <Typography variant="body2">{r.traitName}</Typography>
-            <IconButton size="small" onClick={() => {
-                const traitObj = getTraitObject();
-                if(traitObj) onTraitSelect(traitObj)
-            }}>
-                <HelpOutlineIcon fontSize="inherit" />
-            </IconButton>
+        <Stack direction="row" spacing={0.5}>
+            {hasHelpText && <DescriptionIcon fontSize="small" color="action" />}
+            {hasHelpImages && <ImageIcon fontSize="small" color="action" />}
         </Stack>
       </TableCell>
       <TableCell>
-        <Tooltip title={parentInfo.reason} placement="top-start">
-            <Box>
-                {r.type === "binary" ? (
-                     <ButtonGroup variant="outlined" size="small" disabled={parentInfo.isDisabled}>
-                        <Button variant={selected[r.binary.id] === 1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>{T.state_yes}</Button>
-                        <Button variant={selected[r.binary.id] === -1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>{T.state_no}</Button>
-                        <Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.state_clear}</Button>
-                    </ButtonGroup>
-                ) : (
-                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-                        {r.children.map(c => (
-                            <Button key={c.id} size="small" variant={chosenId === c.id ? 'contained' : 'outlined'} onClick={() => setDerivedPick(r.children.map(x => x.id), c.id, r.traitName)}>{c.label}</Button>
-                        ))}
-                        <Button size="small" variant="outlined" onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>{T.state_clear}</Button>
-                    </Stack>
-                )}
-            </Box>
-        </Tooltip>
+        {r.type === "binary" ? (
+             <ButtonGroup variant="outlined" size="small" onClick={(e) => e.stopPropagation()}>
+                <Button variant={selected[r.binary.id] === 1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>{T.state_yes}</Button>
+                <Button variant={selected[r.binary.id] === -1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>{T.state_no}</Button>
+                <Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.state_clear}</Button>
+            </ButtonGroup>
+        ) : (
+            <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+                {r.children.map(c => (
+                    <Button key={c.id} size="small" variant={chosenId === c.id ? 'contained' : 'outlined'} onClick={() => setDerivedPick(r.children.map(x => x.id), c.id, r.traitName)}>{c.label}</Button>
+                ))}
+                <Button size="small" variant="outlined" onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>{T.state_clear}</Button>
+            </Stack>
+        )}
       </TableCell>
     </TableRow>
   );
 });
 
-
 export default function TraitsPanel(props: Props) {
-  const { title, mode, rows, selected, setBinary, setDerivedPick, clearDerived, sortBy, setSortBy, suggMap, opts, setOpts, onTraitSelect, lang = "ja" } = props;
-  const T = STR[lang].traitsPanel;
+  const { mode, rows, selected, setBinary, setDerivedPick, clearDerived, sortBy, suggMap, onTraitSelect, lang = "ja" } = props;
   
-  const handleBool = (key: keyof AlgoOptions) => (_: any, checked: boolean) => {
-    setOpts({ ...opts, [key]: checked });
-  };
-
   const filteredAndSortedRows = useMemo(() => {
     const filtered = rows.filter(r => {
         if (r.type === 'binary') {
@@ -182,26 +150,8 @@ export default function TraitsPanel(props: Props) {
     return rank;
   }, [filteredAndSortedRows, sortBy, suggMap]);
 
-  // ✨ This is the missing part
   return (
     <Paper sx={{ p: 1.5, display: "flex", flexDirection: "column", height: "100%" }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1, px: 0.5, flexWrap: 'wrap' }}>
-        <Typography variant="h6">{title}</Typography>
-        <Stack direction="row" alignItems="center" spacing={1}>
-            {sortBy === 'recommend' && mode === 'unselected' && (
-                <FormControlLabel 
-                    control={<Switch size="small" checked={opts.usePragmaticScore} onChange={handleBool("usePragmaticScore")} />} 
-                    label={<Typography variant="caption">実用性スコア</Typography>}
-                />
-            )}
-            <ButtonGroup size="small" variant="outlined">
-                <Button onClick={() => setSortBy("recommend")} variant={sortBy === "recommend" ? "contained" : "outlined"}>{T.sort_recommend}</Button>
-                <Button onClick={() => setSortBy("group")} variant={sortBy === "group" ? "contained" : "outlined"}>{T.sort_group}</Button>
-                <Button onClick={() => setSortBy("name")} variant={sortBy === "name" ? "contained" : "outlined"}>{T.sort_name}</Button>
-            </ButtonGroup>
-        </Stack>
-      </Stack>
-
       <TableContainer component={Box} sx={{ flex: 1 }}>
         <Table size="small" stickyHeader>
           <TableHead>
@@ -210,12 +160,12 @@ export default function TraitsPanel(props: Props) {
               <TableCell sx={{ width: 120 }}>Score</TableCell>
               <TableCell sx={{ width: 160 }}>Group</TableCell>
               <TableCell>Trait</TableCell>
+              <TableCell sx={{ width: 80 }}>Help</TableCell>
               <TableCell>State</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredAndSortedRows.map((r) => {
-                const parentInfo = { isDisabled: false, reason: "" };
                 const suggestion = getRowSuggestion(r, suggMap);
               return (<RowRenderer
                 key={r.type === 'binary' ? r.binary.id : r.traitName}
@@ -227,7 +177,6 @@ export default function TraitsPanel(props: Props) {
                 rank={sortBy === 'recommend' ? localSuggRank[suggestion?.traitId ?? ''] : undefined}
                 suggestion={suggestion}
                 lang={lang}
-                parentInfo={parentInfo}
                 onTraitSelect={onTraitSelect}
               />);
             })}

@@ -10,13 +10,14 @@ export type Trait = {
   id: string;
   name: string;
   group: string;
-  type: "binary" | "derived" | "nominal_parent";
+  // ✨ 修正: 'continuous_parent' 型を追加
+  type: "binary" | "derived" | "nominal_parent" | "continuous_parent";
   parent?: string;
   state?: string;
   difficulty?: number;
   risk?: number;
-  helpText?: string;   // ✨ 追加
-  helpImages?: string[]; // ✨ 追加
+  helpText?: string;
+  helpImages?: string[];
 };
 
 export type Taxon = engine.Taxon;

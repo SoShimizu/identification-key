@@ -55,7 +55,7 @@ export default function Ribbon(props: RibbonProps) {
 
   const T = STR[lang];
   
-  const [tab, setTab] = useState<TabKey | null>(null);
+  const [tab, setTab] = useState<TabKey | false>(false);
   const [debugOpen, setDebugOpen] = useState(false);
 
   return (
@@ -68,7 +68,7 @@ export default function Ribbon(props: RibbonProps) {
             zIndex: 1201,
             boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)'
         }}
-        onMouseLeave={() => setTab(null)}
+        onMouseLeave={() => setTab(false)}
     >
       <Toolbar sx={{ px: 2, minHeight: 48, gap: 2 }}>
         <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold" }}>{T.appTitle}</Typography>
@@ -104,7 +104,7 @@ export default function Ribbon(props: RibbonProps) {
         </Tooltip>
       </Toolbar>
 
-      <Collapse in={tab !== null}>
+      <Collapse in={tab !== false}>
         <Box sx={{ px: 2, py: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, bgcolor: 'background.default' }}>
           {tab === "overview" && <RibbonOverviewTab lang={lang} matrixName={matrixName} selected={selected} debugOpen={debugOpen} setDebugOpen={setDebugOpen} />}
           {tab === "algo" && <RibbonAlgoTab lang={lang} matrixName={matrixName} selected={selected} onApplied={onApplied} algorithm={algo} onAlgorithmChange={setAlgo} mode={mode} onModeChange={setMode} />}

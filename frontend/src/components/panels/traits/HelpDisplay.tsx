@@ -1,6 +1,7 @@
 // frontend/src/components/panels/traits/HelpDisplay.tsx
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress, Paper, Stack } from '@mui/material';
+import { Box, Typography, CircularProgress, Paper, Stack, Modal, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { Trait } from '../../../api';
 import { GetHelpImage } from '../../../../wailsjs/go/main/App';
 
@@ -8,7 +9,7 @@ type Props = {
   trait?: Trait;
 };
 
-const ImageWithLoader: React.FC<{ filename: string }> = ({ filename }) => {
+const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ filename, onClick }) => {
     const [imageData, setImageData] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -18,10 +19,14 @@ const ImageWithLoader: React.FC<{ filename: string }> = ({ filename }) => {
         setError(false);
         setImageData(null);
         GetHelpImage(filename)
-            .then((base64Data: string) => { // ✨ 型をstringに指定
-                setImageData(`data:image/png;base64,${base64Data}`);
+            .then((base64Data: string) => {
+                if (base64Data) {
+                    setImageData(`data:image/png;base64,${base64Data}`);
+                } else {
+                    setError(true);
+                }
             })
-            .catch((err: any) => { // ✨ 型をanyに指定
+            .catch((err: any) => {
                 console.error(`Failed to load image ${filename}:`, err);
                 setError(true);
             })
@@ -30,48 +35,85 @@ const ImageWithLoader: React.FC<{ filename: string }> = ({ filename }) => {
             });
     }, [filename]);
 
-    if (loading) return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><CircularProgress size={24} /></Box>;
+    if (loading) return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120 }}><CircularProgress size={24} /></Box>;
     if (error) return <Typography variant="caption" color="error">Image not found</Typography>;
     if (imageData) {
-        return <img src={imageData} alt={filename} style={{ width: '100%', height: 'auto', objectFit: 'contain', borderRadius: '4px' }} />;
+        return (
+            <Box onClick={onClick} sx={{ cursor: 'pointer' }}>
+                <img src={imageData} alt={filename} style={{ width: '100%', height: 'auto', objectFit: 'contain', borderRadius: '4px' }} />
+            </Box>
+        );
     }
     return null;
 };
 
 export default function HelpDisplay({ trait }: Props) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalImage, setModalImage] = useState<string | null>(null);
+
+  const handleImageClick = (filename: string) => {
+    GetHelpImage(filename).then(base64Data => {
+        if(base64Data) {
+            setModalImage(`data:image/png;base64,${base64Data}`);
+            setModalOpen(true);
+        }
+    });
+  };
+
   if (!trait) {
     return (
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
-        <Typography color="text.secondary">形質を選択するとここにヘルプが表示されます</Typography>
+        <Typography color="text.secondary">形質の行をクリックするとヘルプが表示されます</Typography>
       </Box>
     );
   }
 
+  const hasHelpContent = (trait.helpText && trait.helpText.trim() !== "") || (trait.helpImages && trait.helpImages.length > 0);
+
   return (
-    <Paper variant="outlined" sx={{ p: 2, height: '100%', overflowY: 'auto' }}>
-      <Stack spacing={2}>
-        <Box>
-            <Typography variant="caption" color="text.secondary">{trait.group}</Typography>
-            <Typography variant="h6" component="h3">{trait.name}</Typography>
-        </Box>
-        {trait.helpText && (
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
-            {trait.helpText}
-          </Typography>
-        )}
-        {trait.helpImages && trait.helpImages.length > 0 && (
+    <>
+      <Paper variant="outlined" sx={{ p: 2, height: '100%', overflowY: 'auto' }}>
+        <Stack spacing={2}>
           <Box>
-            <Typography variant="subtitle2" gutterBottom>参考画像</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {trait.helpImages.map((filename: string) => ( // ✨ 型をstringに指定
-                    <Box key={filename} sx={{ flex: '1 1 calc(50% - 8px)', minWidth: 120 }}>
-                        <ImageWithLoader filename={filename} />
-                    </Box>
-                ))}
-            </Box>
+              <Typography variant="caption" color="text.secondary">{trait.group}</Typography>
+              <Typography variant="h6" component="h3">{trait.name}</Typography>
           </Box>
-        )}
-      </Stack>
-    </Paper>
+          
+          {!hasHelpContent && (
+              <Typography color="text.secondary">この形質に関する補助材料はありません。</Typography>
+          )}
+
+          {trait.helpText && (
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+              {trait.helpText}
+            </Typography>
+          )}
+          {trait.helpImages && trait.helpImages.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>参考画像</Typography>
+              <Stack spacing={1}>
+                  {trait.helpImages.map((filename: string) => (
+                      <Box key={filename}>
+                          <ImageWithLoader filename={filename} onClick={() => handleImageClick(filename)} />
+                      </Box>
+                  ))}
+              </Stack>
+            </Box>
+          )}
+        </Stack>
+      </Paper>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Box sx={{ position: 'relative', maxHeight: '90vh', maxWidth: '90vw' }}>
+            <IconButton onClick={() => setModalOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)' }}>
+                <CloseIcon />
+            </IconButton>
+            <img src={modalImage || ''} alt="Enlarged view" style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} />
+        </Box>
+      </Modal>
+    </>
   );
 }
