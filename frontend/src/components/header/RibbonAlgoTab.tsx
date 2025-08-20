@@ -5,7 +5,7 @@ import {
   MenuItem, Select, SelectChangeEvent, Slider, Stack, Switch, TextField, Tooltip, Typography
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { clampAlgoOptions, useAlgoOpts } from "../../hooks/useAlgoOpts";
+import { clampAlgoOptions, useAlgoOpts, AlgoOptions } from "../../hooks/useAlgoOpts";
 import { applyFilters } from "../../utils/applyFilters";
 import { STR } from "../../i18n";
 
@@ -17,6 +17,8 @@ type Props = {
   onApplied?: (res: any) => void;
   algorithm?: "bayes" | "heuristic";
   onAlgorithmChange?: (algo: "bayes" | "heuristic") => void;
+  mode: "strict" | "lenient";
+  onModeChange: (mode: "strict" | "lenient") => void;
   lang: "ja" | "en";
 };
 
@@ -24,6 +26,7 @@ export default function RibbonAlgoTab(props: Props) {
   const {
     matrixName, selected, onApplied, lang,
     algorithm = "bayes", onAlgorithmChange,
+    mode, onModeChange,
   } = props;
 
   const T = STR[lang].algoTab;
@@ -36,8 +39,6 @@ export default function RibbonAlgoTab(props: Props) {
   const doApply = async () => {
     setBusy(true);
     try {
-      // Pass "strict" or "lenient" based on penalty, for heuristic compatibility
-      const mode = opts.conflictPenalty > 0.5 ? "strict" : "lenient";
       const res = await applyFilters(selected, mode, algorithm, sane);
       onApplied?.(res);
     } finally {
@@ -51,13 +52,18 @@ export default function RibbonAlgoTab(props: Props) {
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => { void doApply(); }, 300);
     return () => { if (timer.current) window.clearTimeout(timer.current); };
-  }, [auto, sane, algorithm, selected]);
+  }, [auto, sane, algorithm, selected, mode]);
 
-  const onNum = (k: keyof typeof sane) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onNum = (k: keyof AlgoOptions) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.target.value);
     if (!Number.isNaN(v)) setOpts({ ...opts, [k]: v } as any);
   };
   
+  useEffect(() => {
+    onModeChange(opts.conflictPenalty > 0.5 ? "strict" : "lenient");
+  }, [opts.conflictPenalty, onModeChange]);
+
+
   const labelSx = { display:"flex", alignItems:"center", gap:0.5 };
 
   return (
@@ -83,7 +89,7 @@ export default function RibbonAlgoTab(props: Props) {
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" }, alignItems: "start" }}>
           <Box>
             <Stack spacing={1}>
-              <Box sx={labelSx}><Typography variant="body2">矛盾ペナルティ</Typography><Tooltip title="矛盾に対するペナルティの強さを調整します。0は寛容、1は厳格です。"><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <Box sx={labelSx}><Typography variant="body2">矛盾ペナルティ ({mode})</Typography><Tooltip title="矛盾に対するペナルティの強さを調整します。0 (Lenient) から 1 (Strict) の間で設定します。"><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
               <Slider min={0} max={1} step={0.05} value={sane.conflictPenalty} onChange={(_, v) => setOpts({ ...opts, conflictPenalty: v as number })} />
               <TextField size="small" type="number" value={sane.conflictPenalty} onChange={onNum("conflictPenalty")} inputProps={{ step: 0.05, min: 0, max: 1 }} />
             </Stack>
@@ -109,7 +115,7 @@ export default function RibbonAlgoTab(props: Props) {
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary">
-            ヒューリスティックモードには、調整可能なパラメータはありません。
+            ヒューリスティックモードでは、矛盾ペナルティ（Strict/Lenient）のみが有効です。
         </Typography>
       )}
     </Box>

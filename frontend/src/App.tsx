@@ -1,12 +1,13 @@
 // frontend/src/App.tsx
 import React from "react";
-import { CssBaseline, ThemeProvider, createTheme, Box, Chip } from "@mui/material";
+import { CssBaseline, ThemeProvider, createTheme, Box } from "@mui/material";
 import { useMatrix } from "./hooks/useMatrix";
 import Ribbon from "./components/header/Ribbon";
 import TraitsPanel from "./components/panels/traits/TraitsPanel";
 import HistoryPanel from "./components/panels/history/HistoryPanel";
 import CandidatesPanel, { EngineScore } from "./components/panels/candidates/CandidatesPanel";
 import { STR } from "./i18n";
+import { Choice } from "./api";
 
 const fontLink = document.createElement('link');
 fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
@@ -39,8 +40,10 @@ export default function App() {
   const {
     matrixName, taxaCount, rows,
     selected, setBinary, setDerivedPick, clearDerived,
-    scores, suggMap, sortBy, setSortBy, suggAlgo, setSuggAlgo,
-    mode, setMode, algo, setAlgo,
+    scores, suggMap, sortBy, setSortBy,
+    mode, setMode,
+    algo, setAlgo,
+    opts, setOpts, // ✨ optsとsetOptsを受け取る
     keys, activeKey, pickKey, refreshKeys,
     history,
   } = useMatrix();
@@ -73,13 +76,17 @@ export default function App() {
     }),
     [themeMode]
   );
-
+  
   const suggRank: Record<string, number> = React.useMemo(() => {
     const m = suggMap || {};
-    const entries = Object.entries(m).filter(([, v]) => typeof v === "number" && isFinite(v));
-    entries.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+    const entries = Object.entries(m);
+    entries.sort(([, suggA], [, suggB]) => (suggB?.score ?? -1) - (suggA?.score ?? -1));
     const rank: Record<string, number> = {};
-    entries.forEach(([id], i) => { rank[id] = i + 1; });
+    entries.forEach(([, suggestion], i) => {
+        if (suggestion && suggestion.traitId) {
+            rank[suggestion.traitId] = i + 1;
+        }
+    });
     return rank;
   }, [suggMap]);
 
@@ -103,37 +110,23 @@ export default function App() {
       case "history":
         return <HistoryPanel title={T.panels.history} items={history as any} />;
       case "traits_unselected":
-        return (
-          <TraitsPanel
-            lang={lang}
-            title={T.panels.traits_unselected}
-            mode="unselected"
-            rows={rows}
-            selected={selected as Record<string, number>}
-            setBinary={(id, val, label) => setBinary(id, val as any, label)}
-            setDerivedPick={setDerivedPick}
-            clearDerived={clearDerived}
-            sortBy={sortBy}
-            setSortBy={setSortBy}
-            suggMap={suggMap}
-            suggRank={suggRank}
-          />
-        );
       case "traits_selected":
         return (
           <TraitsPanel
             lang={lang}
-            title={T.panels.traits_selected}
-            mode="selected"
+            title={k === "traits_unselected" ? T.panels.traits_unselected : T.panels.traits_selected}
+            mode={k === "traits_unselected" ? "unselected" : "selected"}
             rows={rows}
             selected={selected as Record<string, number>}
-            setBinary={(id, val, label) => setBinary(id, val as any, label)}
+            setBinary={(id, val, label) => setBinary(id, val as Choice, label)}
             setDerivedPick={setDerivedPick}
             clearDerived={clearDerived}
             sortBy={sortBy}
             setSortBy={setSortBy}
             suggMap={suggMap}
             suggRank={suggRank}
+            opts={opts} // ✨ propsとして渡す
+            setOpts={setOpts} // ✨ propsとして渡す
           />
         );
     }
@@ -148,7 +141,8 @@ export default function App() {
           matrixName={matrixName || ""}
           selected={selected as Record<string, number>}
           keys={keys} activeKey={activeKey} onPickKey={pickKey} onRefreshKeys={refreshKeys}
-          mode={mode} setMode={setMode}
+          mode={mode}
+          setMode={setMode}
           algo={algo} setAlgo={setAlgo}
           themeMode={themeMode} setThemeMode={setThemeMode}
           layout={layout} onLayoutChange={(v) => { setLayout(v); saveLayout(v); }}

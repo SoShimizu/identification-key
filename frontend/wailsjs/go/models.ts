@@ -23,7 +23,8 @@ export namespace engine {
 	    type: string;
 	    parent?: string;
 	    state?: string;
-	    cost?: number;
+	    difficulty?: number;
+	    risk?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Trait(source);
@@ -37,7 +38,8 @@ export namespace engine {
 	        this.type = source["type"];
 	        this.parent = source["parent"];
 	        this.state = source["state"];
-	        this.cost = source["cost"];
+	        this.difficulty = source["difficulty"];
+	        this.risk = source["risk"];
 	    }
 	}
 	export class Matrix {
@@ -143,7 +145,8 @@ export namespace engine {
 	    gini: number;
 	    entropy: number;
 	    pStates: StateProb[];
-	    cost?: number;
+	    difficulty?: number;
+	    risk?: number;
 	    score: number;
 	
 	    static createFrom(source: any = {}) {
@@ -160,7 +163,8 @@ export namespace engine {
 	        this.gini = source["gini"];
 	        this.entropy = source["entropy"];
 	        this.pStates = this.convertValues(source["pStates"], StateProb);
-	        this.cost = source["cost"];
+	        this.difficulty = source["difficulty"];
+	        this.risk = source["risk"];
 	        this.score = source["score"];
 	    }
 	
@@ -195,10 +199,12 @@ export namespace main {
 	    confidence?: Record<string, number>;
 	    priors?: Record<string, number>;
 	    wantInfoGain: boolean;
+	    usePragmaticScore: boolean;
 	    lambda: number;
 	    a0: number;
 	    b0: number;
 	    kappa: number;
+	    conflictPenalty: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ApplyOptions(source);
@@ -213,10 +219,12 @@ export namespace main {
 	        this.confidence = source["confidence"];
 	        this.priors = source["priors"];
 	        this.wantInfoGain = source["wantInfoGain"];
+	        this.usePragmaticScore = source["usePragmaticScore"];
 	        this.lambda = source["lambda"];
 	        this.a0 = source["a0"];
 	        this.b0 = source["b0"];
 	        this.kappa = source["kappa"];
+	        this.conflictPenalty = source["conflictPenalty"];
 	    }
 	}
 	export class ApplyResultEx {

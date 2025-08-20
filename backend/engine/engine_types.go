@@ -10,13 +10,14 @@ const (
 )
 
 type Trait struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Group  string  `json:"group"`
-	Type   string  `json:"type"`
-	Parent string  `json:"parent,omitempty"`
-	State  string  `json:"state,omitempty"`
-	Cost   float64 `json:"cost,omitempty"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Group      string  `json:"group"`
+	Type       string  `json:"type"`
+	Parent     string  `json:"parent,omitempty"`
+	State      string  `json:"state,omitempty"`
+	Difficulty float64 `json:"difficulty,omitempty"`
+	Risk       float64 `json:"risk,omitempty"`
 }
 
 type Taxon struct {
@@ -32,7 +33,7 @@ type Matrix struct {
 }
 
 type TaxonScore struct {
-	Index     int     `json:"index"` // The original index in Matrix.Taxa
+	Index     int     `json:"index"`
 	Taxon     Taxon   `json:"taxon"`
 	Post      float64 `json:"post"`
 	Delta     float64 `json:"delta"`
@@ -48,27 +49,29 @@ type StateProb struct {
 }
 
 type TraitSuggestion struct {
-	TraitId string      `json:"traitId"`
-	Name    string      `json:"name"`
-	Group   string      `json:"group"`
-	IG      float64     `json:"ig"`
-	ECR     float64     `json:"ecr"`
-	Gini    float64     `json:"gini"`
-	Entropy float64     `json:"entropy"`
-	PStates []StateProb `json:"pStates"`
-	Cost    float64     `json:"cost,omitempty"`
-	Score   float64     `json:"score"`
+	TraitId    string      `json:"traitId"`
+	Name       string      `json:"name"`
+	Group      string      `json:"group"`
+	IG         float64     `json:"ig"`
+	ECR        float64     `json:"ecr"`
+	Gini       float64     `json:"gini"`
+	Entropy    float64     `json:"entropy"`
+	PStates    []StateProb `json:"pStates"`
+	Difficulty float64     `json:"difficulty,omitempty"`
+	Risk       float64     `json:"risk,omitempty"`
+	Score      float64     `json:"score"`
 }
 
 type AlgoOptions struct {
-	DefaultAlphaFP  float64 `json:"defaultAlphaFP"`
-	DefaultBetaFN   float64 `json:"defaultBetaFN"`
-	WantInfoGain    bool    `json:"wantInfoGain"`
-	Lambda          float64 `json:"lambda"`
-	A0              float64 `json:"a0"`
-	B0              float64 `json:"b0"`
-	Kappa           float64 `json:"kappa"`
-	ConflictPenalty float64 `json:"conflictPenalty"` // New field for adjustable penalty
+	DefaultAlphaFP    float64 `json:"defaultAlphaFP"`
+	DefaultBetaFN     float64 `json:"defaultBetaFN"`
+	WantInfoGain      bool    `json:"wantInfoGain"`
+	UsePragmaticScore bool    `json:"usePragmaticScore"` // ✨ ロジック切り替えフラグを追加
+	Lambda            float64 `json:"lambda"`
+	A0                float64 `json:"a0"`
+	B0                float64 `json:"b0"`
+	Kappa             float64 `json:"kappa"`
+	ConflictPenalty   float64 `json:"conflictPenalty"`
 }
 
 type EvalResult struct {

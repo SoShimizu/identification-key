@@ -22,7 +22,6 @@ func (a *App) EnsureMyKeysAndSamples() error {
 		return nil
 	}
 
-	// デモ：binary v2, mixed v2, small v2 を作っておく
 	if err := writeSampleBinaryV2(filepath.Join(a.keysDir, "Binary_v2_demo.xlsx")); err != nil {
 		return err
 	}
@@ -58,8 +57,7 @@ func (a *App) PickKey(name string) error {
 // GetMatrix: 現在の行列（名前/タクサ数/Traits含む）を返す
 func (a *App) GetMatrix() (*engine.Matrix, error) {
 	if a.currentMatrix == nil {
-		// まだ何も選んでいない → keys/ を見て最初をロード
-		_ = a.EnsureMyKeysAndSamples() // もし空ならサンプル生成
+		_ = a.EnsureMyKeysAndSamples()
 		list, err := a.listXLSX()
 		if err != nil {
 			return nil, err
@@ -83,7 +81,7 @@ func (a *App) ApplyFiltersAlgoOpt(
 	selected map[string]int,
 	mode string,
 	algo string,
-	opts ApplyOptions, // ← app 側の公開型（types.go）
+	opts ApplyOptions,
 ) (*ApplyResultEx, error) {
 	if a.currentMatrix == nil {
 		if _, err := a.GetMatrix(); err != nil {
@@ -93,13 +91,15 @@ func (a *App) ApplyFiltersAlgoOpt(
 
 	// app 側オプション → engine 側オプションへ写し替え
 	eopts := engine.AlgoOptions{
-		DefaultAlphaFP: opts.DefaultAlphaFP,
-		DefaultBetaFN:  opts.DefaultBetaFN,
-		WantInfoGain:   opts.WantInfoGain,
-		Lambda:         opts.Lambda,
-		A0:             opts.A0,
-		B0:             opts.B0,
-		Kappa:          opts.Kappa,
+		DefaultAlphaFP:    opts.DefaultAlphaFP,
+		DefaultBetaFN:     opts.DefaultBetaFN,
+		WantInfoGain:      opts.WantInfoGain,
+		UsePragmaticScore: opts.UsePragmaticScore, // ✨ この行を追加して値を引き渡す
+		Lambda:            opts.Lambda,
+		A0:                opts.A0,
+		B0:                opts.B0,
+		Kappa:             opts.Kappa,
+		ConflictPenalty:   opts.ConflictPenalty,
 	}
 
 	// 新しいエンジンへ処理を委譲

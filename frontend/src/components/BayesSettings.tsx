@@ -2,7 +2,7 @@
 import React from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  FormControlLabel, Checkbox, Button, TextField, Stack, Typography
+  Button, TextField, Stack, Typography
 } from "@mui/material";
 import { AlgoOptions, clampAlgoOptions } from "../hooks/useAlgoOpts";
 
@@ -20,12 +20,10 @@ export default function BayesSettings(props: Props) {
   const handleNum = (key: keyof AlgoOptions) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.target.value);
     if (!Number.isNaN(v)) {
-      onChange({ ...value, [key]: v });
+      // Create a new object to avoid type issues with key indexing
+      const updatedValue: AlgoOptions = { ...value, [key]: v };
+      onChange(updatedValue);
     }
-  };
-
-  const handleBool = (key: keyof AlgoOptions) => (_: any, checked: boolean) => {
-    onChange({ ...value, [key]: checked });
   };
 
   const apply = () => {
@@ -69,15 +67,8 @@ export default function BayesSettings(props: Props) {
             value={value.epsilonCut} onChange={handleNum("epsilonCut")}
           />
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={value.useHardContradiction}
-                onChange={handleBool("useHardContradiction")}
-              />
-            }
-            label="ハード矛盾除外（strict時）"
-          />
+          {/* The FormControlLabel for useHardContradiction has been removed as it is now handled by the conflictPenalty slider in RibbonAlgoTab.tsx */}
+
         </Stack>
       </DialogContent>
       <DialogActions>

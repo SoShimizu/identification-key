@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// ... (computeMatchStats, stateDef, getTraitMetaMap, buildStateDefs, compatibleBinary remain the same)
 func computeMatchStats(obs map[string]Ternary, tx *Taxon) (matches, support, conflicts int) {
 	for tid, o := range obs {
 		if o == NA {
@@ -32,6 +33,21 @@ type stateDef struct {
 	traitID  string
 	name     string
 	group    string
+}
+
+func getTraitMetaMap(traits []Trait) map[string]Trait {
+	metaMap := make(map[string]Trait, len(traits))
+	for _, t := range traits {
+		if t.Type != "derived" {
+			metaMap[t.ID] = t
+		}
+	}
+	for _, t := range traits {
+		if t.Type != "derived" {
+			metaMap[t.Name] = t
+		}
+	}
+	return metaMap
 }
 
 func buildStateDefs(m *Matrix) []stateDef {
@@ -88,8 +104,8 @@ func compatibleBinary(val Ternary, wantYes bool) bool {
 	return val == No
 }
 
-// posterior と行列から IG/ECR を算出
-func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[string]int) []TraitSuggestion {
+// ✨ AlgoOptions を引数に追加
+func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[string]int, opt AlgoOptions) []TraitSuggestion {
 	if len(m.Taxa) == 0 || len(m.Traits) == 0 || len(post) != len(m.Taxa) {
 		return nil
 	}
@@ -98,6 +114,7 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 	cNow := countAbove(post, tau)
 
 	defs := buildStateDefs(m)
+	traitMeta := getTraitMetaMap(m.Traits)
 
 	filtered := make([]stateDef, 0, len(defs))
 	for _, d := range defs {
@@ -121,6 +138,7 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 
 	out := make([]TraitSuggestion, 0, len(filtered))
 	for _, d := range filtered {
+		// ... (py, labels, gini, ent, expH, expRed, ig calculation remains the same)
 		var py []float64
 		var labels []string
 
@@ -151,14 +169,12 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 		}
 		normalize(py)
 
-		// バランス
 		gini := 1.0
 		for _, v := range py {
 			gini -= v * v
 		}
 		ent := shannon(py)
 
-		// 期待エントロピー・期待候補削減率
 		expH := 0.0
 		expRed := 0.0
 		for s := range py {
@@ -191,14 +207,50 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 		}
 		ig := Hnow - expH
 
+		meta, ok := traitMeta[d.traitID]
+		if !ok {
+			meta, ok = traitMeta[d.name]
+		}
+		difficulty := 1.0
+		risk := 0.0
+		if ok {
+			difficulty = meta.Difficulty
+			if difficulty <= 0 {
+				difficulty = 1.0
+			}
+			risk = meta.Risk
+			if risk < 0 {
+				risk = 0
+			}
+			if risk > 1 {
+				risk = 1
+			}
+		}
+
+		// ✨ UsePragmaticScore の値に応じてスコア計算を切り替える
+		var score float64
+		if opt.UsePragmaticScore {
+			score = (ig / difficulty) * (1.0 - risk)
+		} else {
+			score = ig // 純粋な情報利得を使用
+		}
+
 		ps := make([]StateProb, len(py))
 		for i := range py {
 			ps[i] = StateProb{State: labels[i], P: py[i]}
 		}
 		out = append(out, TraitSuggestion{
-			TraitId: d.traitID, Name: d.name, Group: d.group,
-			IG: ig, ECR: expRed, Gini: gini, Entropy: ent,
-			PStates: ps, Score: ig,
+			TraitId:    d.traitID,
+			Name:       d.name,
+			Group:      d.group,
+			IG:         ig,
+			ECR:        expRed,
+			Gini:       gini,
+			Entropy:    ent,
+			PStates:    ps,
+			Difficulty: difficulty,
+			Risk:       risk,
+			Score:      score,
 		})
 	}
 

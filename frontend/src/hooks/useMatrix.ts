@@ -1,11 +1,11 @@
 // frontend/src/hooks/useMatrix.ts
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Dispatch, SetStateAction } from "react";
 import { EnsureMyKeysAndSamples, ListMyKeys, GetCurrentKeyName, PickKey } from "../../wailsjs/go/main/App";
-import { getMatrix, applyFilters, Matrix, TaxonScore, Trait, TraitSuggestion, Choice } from "../api";
+import { applyFilters } from "../utils/applyFilters";
+import { Matrix, TaxonScore, Trait, TraitSuggestion, Choice } from "../api";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
-import { useAlgoOpts } from "./useAlgoOpts";
+import { useAlgoOpts, AlgoOptions } from "./useAlgoOpts";
 
-// Small utility for debouncing
 function useDebouncedCallback<T extends any[]>(fn: (...args: T) => void, delay: number) {
   const ref = useRef<number | undefined>(undefined);
   return useCallback((...args: T) => {
@@ -20,36 +20,59 @@ export type TraitRow =
   | { group: string; traitName: string; type: "binary"; binary: Trait }
   | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[], parent?: string };
 
-export function useMatrix() {
-  // MyKeys
+type UseMatrixReturn = {
+    rows: TraitRow[];
+    traits: Trait[];
+    matrixName: string;
+    taxaCount: number;
+    selected: Record<string, Choice>;
+    setBinary: (traitId: string, val: Choice, label?: string) => void;
+    setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel?: string) => void;
+    clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
+    mode: "strict" | "lenient";
+    setMode: (newMode: "strict" | "lenient") => void;
+    algo: "bayes" | "heuristic";
+    setAlgo: Dispatch<SetStateAction<"bayes" | "heuristic">>;
+    opts: AlgoOptions;
+    setOpts: Dispatch<SetStateAction<AlgoOptions>>;
+    scores: TaxonScore[];
+    suggs: TraitSuggestion[];
+    // ✨ suggMapの型を変更
+    suggMap: Record<string, TraitSuggestion>;
+    sortBy: "recommend" | "group" | "name";
+    setSortBy: Dispatch<SetStateAction<"recommend" | "group" | "name">>;
+    suggAlgo: "gini" | "entropy";
+    setSuggAlgo: Dispatch<SetStateAction<"gini" | "entropy">>;
+    pickKey: (name: string) => Promise<void>;
+    keys: KeyInfo[];
+    activeKey: string | undefined;
+    refreshKeys: () => Promise<void>;
+    history: { t: number; text: string; gain?: number }[];
+};
+
+
+export function useMatrix(): UseMatrixReturn {
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
-
-  // Matrix
   const [matrixName, setMatrixName] = useState<string>("");
   const [traits, setTraits] = useState<Trait[]>([]);
   const [taxaCount, setTaxaCount] = useState<number>(0);
-
-  // selection
   const [selected, setSelected] = useState<Record<string, Choice>>({});
-
-  // mode/algo from UI settings
   const { opts, setOpts } = useAlgoOpts(matrixName);
   const [algo, setAlgo] = useState<"bayes" | "heuristic">("bayes");
-  const mode = useMemo(() => opts.conflictPenalty > 0.5 ? "strict" : "lenient", [opts.conflictPenalty]);
-
-  // results
+  const mode = useMemo(() => (opts.conflictPenalty > 0.5 ? "strict" : "lenient"), [opts.conflictPenalty]);
+  const setMode = useCallback((newMode: "strict" | "lenient") => {
+      setOpts(prevOpts => ({
+          ...prevOpts,
+          conflictPenalty: newMode === 'strict' ? 1.0 : 0.0,
+      }));
+  }, [setOpts]);
   const [scores, setScores] = useState<TaxonScore[]>([]);
   const [suggs, setSuggs] = useState<TraitSuggestion[]>([]);
-
-  // display settings
   const [suggAlgo, setSuggAlgo] = useState<"gini" | "entropy">("gini");
   const [sortBy, setSortBy] = useState<"recommend" | "group" | "name">("group");
-
-  // history
   const [history, setHistory] = useState<{ t: number; text: string; gain?: number }[]>([]);
 
-  // === MyKeys ===
   const refreshKeys = useCallback(async () => {
     await EnsureMyKeysAndSamples();
     const list = (await ListMyKeys()) as any as KeyInfo[];
@@ -66,9 +89,8 @@ export function useMatrix() {
     setHistory([]);
   }, []);
 
-  // === Matrix Loading ===
   const loadMatrix = useCallback(async () => {
-    const m: Matrix = await getMatrix();
+    const m: Matrix = await (window as any).go.main.App.GetMatrix();
     setTraits(m.traits ?? []);
     setTaxaCount(m.taxa?.length ?? 0);
     setMatrixName(m.name ?? "");
@@ -81,7 +103,6 @@ export function useMatrix() {
     return () => { if (unsubscribe) unsubscribe(); };
   }, [loadMatrix, refreshKeys]);
 
-  // === Evaluation (debounced) ===
   const runEval = useCallback(async () => {
     const res = await applyFilters(selected, mode, algo, { ...opts, wantInfoGain: true });
     setScores(res.scores || []);
@@ -91,7 +112,6 @@ export function useMatrix() {
   const runEvalDebounced = useDebouncedCallback(runEval, 120);
   useEffect(() => { runEvalDebounced(); }, [runEvalDebounced]);
 
-  // === Selection Handlers ===
   const setBinary = useCallback((traitId: string, val: Choice, label?: string) => {
     setSelected((prev) => {
       const next = { ...prev, [traitId]: val };
@@ -118,13 +138,16 @@ export function useMatrix() {
     });
   }, []);
 
-  // === Memoized derived state ===
-  const suggMap = useMemo(() => {
-    const m: Record<string, number> = {};
+  // ✨ suggMapがTraitSuggestionオブジェクト全体を保持するように修正
+  const suggMap: Record<string, TraitSuggestion> = useMemo(() => {
+    const m: Record<string, TraitSuggestion> = {};
     for (const s of suggs || []) {
-      const id = s.traitId;
-      const sc = s.score ?? s.ig ?? 0;
-      if (id) m[id] = Number(sc) || 0;
+      if (s.traitId) {
+        m[s.traitId] = s;
+      }
+      // derived children might also be in the suggestions list, so we map them too.
+      // This part is crucial if suggestions can be for individual derived states.
+      // Assuming parent traitId is the key for now.
     }
     return m;
   }, [suggs]);
@@ -146,7 +169,6 @@ export function useMatrix() {
     }
 
     const out: TraitRow[] = [];
-    // Add nominal/ordinal parents first
     for (const parentName in byParent) {
         if (parents[parentName] && byParent[parentName]) {
             out.push({
@@ -159,7 +181,6 @@ export function useMatrix() {
         }
     }
 
-    // Add binary traits
     for (const t of binaryTraits) {
         out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
     }
