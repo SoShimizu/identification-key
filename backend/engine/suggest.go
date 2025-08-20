@@ -32,14 +32,11 @@ type stateDef struct {
 	traitID  string
 	name     string
 	group    string
-	cost     float64
 }
 
 func buildStateDefs(m *Matrix) []stateDef {
 	childrenByParent := map[string][]Trait{}
-	traitMap := make(map[string]Trait)
 	for _, t := range m.Traits {
-		traitMap[t.ID] = t
 		if strings.EqualFold(t.Type, "derived") {
 			p := strings.TrimSpace(t.Parent)
 			childrenByParent[p] = append(childrenByParent[p], t)
@@ -58,7 +55,6 @@ func buildStateDefs(m *Matrix) []stateDef {
 				traitID: t.ID,
 				name:    t.Name,
 				group:   t.Group,
-				cost:    t.Cost,
 			})
 		} else {
 			ids := make([]string, 0, len(kids))
@@ -79,7 +75,6 @@ func buildStateDefs(m *Matrix) []stateDef {
 				group:    t.Group,
 				childIDs: ids,
 				labels:   lb,
-				cost:     t.Cost,
 			})
 		}
 	}
@@ -156,12 +151,14 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 		}
 		normalize(py)
 
+		// バランス
 		gini := 1.0
 		for _, v := range py {
 			gini -= v * v
 		}
 		ent := shannon(py)
 
+		// 期待エントロピー・期待候補削減率
 		expH := 0.0
 		expRed := 0.0
 		for s := range py {
@@ -194,12 +191,6 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 		}
 		ig := Hnow - expH
 
-		cost := d.cost
-		if cost <= 0 {
-			cost = 1.0
-		}
-		score := ig / cost
-
 		ps := make([]StateProb, len(py))
 		for i := range py {
 			ps[i] = StateProb{State: labels[i], P: py[i]}
@@ -207,7 +198,7 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 		out = append(out, TraitSuggestion{
 			TraitId: d.traitID, Name: d.name, Group: d.group,
 			IG: ig, ECR: expRed, Gini: gini, Entropy: ent,
-			PStates: ps, Score: score, Cost: cost,
+			PStates: ps, Score: ig,
 		})
 	}
 

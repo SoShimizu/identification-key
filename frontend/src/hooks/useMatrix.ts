@@ -1,9 +1,11 @@
+// frontend/src/hooks/useMatrix.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EnsureMyKeysAndSamples, ListMyKeys, GetCurrentKeyName, PickKey } from "../../wailsjs/go/main/App";
-import { getMatrix, applyFiltersAlgoOpt, Matrix, TaxonScore, Trait, TraitSuggestion, Choice } from "../api";
+import { getMatrix, applyFilters, Matrix, TaxonScore, Trait, TraitSuggestion, Choice } from "../api";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { useAlgoOpts } from "./useAlgoOpts";
 
-// 小ユーティリティ
+// Small utility for debouncing
 function useDebouncedCallback<T extends any[]>(fn: (...args: T) => void, delay: number) {
   const ref = useRef<number | undefined>(undefined);
   return useCallback((...args: T) => {
@@ -16,7 +18,7 @@ export type KeyInfo = { name: string; path?: string };
 
 export type TraitRow =
   | { group: string; traitName: string; type: "binary"; binary: Trait }
-  | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[] };
+  | { group: string; traitName: string; type: "derived"; children: { id: string; label: string }[], parent?: string };
 
 export function useMatrix() {
   // MyKeys
@@ -31,18 +33,20 @@ export function useMatrix() {
   // selection
   const [selected, setSelected] = useState<Record<string, Choice>>({});
 
-  // mode/algo
-  const [mode, setMode] = useState<"lenient" | "strict">("lenient");
+  // mode/algo from UI settings
+  const { opts, setOpts } = useAlgoOpts(matrixName);
   const [algo, setAlgo] = useState<"bayes" | "heuristic">("bayes");
+  const mode = useMemo(() => opts.conflictPenalty > 0.5 ? "strict" : "lenient", [opts.conflictPenalty]);
 
   // results
   const [scores, setScores] = useState<TaxonScore[]>([]);
   const [suggs, setSuggs] = useState<TraitSuggestion[]>([]);
 
-  // 推奨アルゴ表示
+  // display settings
   const [suggAlgo, setSuggAlgo] = useState<"gini" | "entropy">("gini");
+  const [sortBy, setSortBy] = useState<"recommend" | "group" | "name">("group");
 
-  // 履歴
+  // history
   const [history, setHistory] = useState<{ t: number; text: string; gain?: number }[]>([]);
 
   // === MyKeys ===
@@ -62,7 +66,7 @@ export function useMatrix() {
     setHistory([]);
   }, []);
 
-  // === 行列のロード ===
+  // === Matrix Loading ===
   const loadMatrix = useCallback(async () => {
     const m: Matrix = await getMatrix();
     setTraits(m.traits ?? []);
@@ -73,10 +77,21 @@ export function useMatrix() {
   useEffect(() => {
     loadMatrix();
     refreshKeys();
-    EventsOn("matrix_changed", loadMatrix);
+    const unsubscribe = EventsOn("matrix_changed", loadMatrix);
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [loadMatrix, refreshKeys]);
 
-  // === 選択操作 ===
+  // === Evaluation (debounced) ===
+  const runEval = useCallback(async () => {
+    const res = await applyFilters(selected, mode, algo, { ...opts, wantInfoGain: true });
+    setScores(res.scores || []);
+    setSuggs(res.suggestions || []);
+  }, [selected, mode, algo, opts]);
+
+  const runEvalDebounced = useDebouncedCallback(runEval, 120);
+  useEffect(() => { runEvalDebounced(); }, [runEvalDebounced]);
+
+  // === Selection Handlers ===
   const setBinary = useCallback((traitId: string, val: Choice, label?: string) => {
     setSelected((prev) => {
       const next = { ...prev, [traitId]: val };
@@ -88,8 +103,7 @@ export function useMatrix() {
   const setDerivedPick = useCallback((childrenIds: string[], chosenId: string, parentLabel?: string) => {
     setSelected((prev) => {
       const next = { ...prev };
-      for (const cid of childrenIds) next[cid] = 0 as Choice;
-      next[chosenId] = 1 as Choice;
+      for (const cid of childrenIds) next[cid] = (cid === chosenId ? 1 : -1) as Choice;
       setHistory((h) => [{ t: Date.now(), text: `Pick ${parentLabel || "(derived)"} => ${chosenId}` }, ...h].slice(0, 200));
       return next;
     });
@@ -104,29 +118,7 @@ export function useMatrix() {
     });
   }, []);
 
-  // === 評価（デバウンス） ===
-  const runEval = useCallback(async () => {
-    const res = await applyFiltersAlgoOpt(
-      selected as Record<string, number>,
-      mode,
-      algo,
-      {
-        defaultAlphaFP: 0.03,
-        defaultBetaFN: 0.05,
-        wantInfoGain: true,
-        lambda: 0,
-        a0: 1, b0: 1, kappa: 1,
-        tau: 0.01,
-      }
-    );
-    setScores(res.scores || []);
-    setSuggs(res.suggestions || []);
-  }, [selected, mode, algo]);
-
-  const runEvalDebounced = useDebouncedCallback(runEval, 120);
-  useEffect(() => { runEvalDebounced(); }, [runEvalDebounced, selected, mode, algo]);
-
-  // === 推奨マップ（ID -> score） ===
+  // === Memoized derived state ===
   const suggMap = useMemo(() => {
     const m: Record<string, number> = {};
     for (const s of suggs || []) {
@@ -137,73 +129,49 @@ export function useMatrix() {
     return m;
   }, [suggs]);
 
-  // === 表示用行（親まとめ） ===
   const rowsUI = useMemo(() => {
     const byParent: Record<string, Trait[]> = {};
+    const parents: Record<string, Trait> = {};
+    const binaryTraits: Trait[] = [];
+
     for (const t of traits) {
-      if ((t.type || "").toLowerCase() === "derived") {
-        const pid = (t.parent || "").trim();
-        if (!byParent[pid]) byParent[pid] = [];
-        byParent[pid].push(t);
-      }
-    }
-    const out: TraitRow[] = [];
-    for (const t of traits) {
-      if ((t.type || "").toLowerCase() !== "derived") {
-        const kids = [
-          ...(byParent[t.id || ""] || []),
-          ...(byParent[t.name || ""] || []),
-        ];
-        if (kids.length === 0) {
-          out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
-        } else {
-          out.push({
-            group: t.group || "",
-            traitName: t.name,
-            type: "derived",
-            children: kids.map(c => ({ id: c.id, label: c.state || c.name })),
-          });
+        if (t.type === 'nominal_parent') {
+            parents[t.name] = t;
+        } else if (t.type === 'derived' && t.parent) {
+            if (!byParent[t.parent]) byParent[t.parent] = [];
+            byParent[t.parent].push(t);
+        } else if (t.type === 'binary') {
+            binaryTraits.push(t);
         }
-      }
     }
-    // 親が無い子だけのケース
-    for (const pid of Object.keys(byParent)) {
-      if (!pid) continue;
-      const exists = out.some(r => r.traitName === pid);
-      if (!exists) {
-        const kids = byParent[pid];
-        const grp = kids[0]?.group || "";
-        out.push({
-          group: grp,
-          traitName: pid,
-          type: "derived",
-          children: kids.map(c => ({ id: c.id, label: c.state || c.name })),
-        });
-      }
+
+    const out: TraitRow[] = [];
+    // Add nominal/ordinal parents first
+    for (const parentName in byParent) {
+        if (parents[parentName] && byParent[parentName]) {
+            out.push({
+                group: parents[parentName].group || "",
+                traitName: parentName,
+                type: "derived",
+                parent: parents[parentName].parent,
+                children: byParent[parentName].map(c => ({ id: c.id, label: c.state || c.name })),
+            });
+        }
+    }
+
+    // Add binary traits
+    for (const t of binaryTraits) {
+        out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
     }
     return out;
   }, [traits]);
-
-  // 左ペインのソート
-  const [sortBy, setSortBy] = useState<"recommend" | "group" | "name">("group");
-
+  
   return {
-    // Matrix 表示
     rows: rowsUI, traits, matrixName, taxaCount,
-
-    // selection
     selected, setBinary, setDerivedPick, clearDerived,
-
-    // mode / algo
-    mode, setMode, algo, setAlgo,
-
-    // results
+    mode, setMode, algo, setAlgo, opts, setOpts,
     scores, suggs, suggMap, sortBy, setSortBy, suggAlgo, setSuggAlgo,
-
-    // MyKeys
     pickKey, keys, activeKey, refreshKeys,
-
-    // 履歴
     history,
   };
 }

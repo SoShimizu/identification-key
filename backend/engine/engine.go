@@ -6,6 +6,7 @@ import (
 	"sort"
 )
 
+// ApplyFiltersAlgoOpt : 選択を反映して候補タクサと「次に効く形質」を返す
 func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, opt AlgoOptions) (*EvalResult, error) {
 	if m == nil {
 		return nil, errors.New("no matrix loaded")
@@ -35,27 +36,8 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 	default: // "bayes"
 		_, scores, err = evaluateBayes(m, selected, opt, mode)
 		if err == nil {
-			if mode == "strict" {
-				var conflictFreeScores []TaxonScore
-				for _, s := range scores {
-					if s.Conflicts == 0 {
-						conflictFreeScores = append(conflictFreeScores, s)
-					}
-				}
-
-				if len(conflictFreeScores) > 0 && len(conflictFreeScores) < len(scores) {
-					tempPost := make([]float64, len(conflictFreeScores))
-					for i, s := range conflictFreeScores {
-						tempPost[i] = s.Post
-					}
-					normalize(tempPost)
-					for i := range conflictFreeScores {
-						conflictFreeScores[i].Post = tempPost[i]
-					}
-					scores = conflictFreeScores
-				}
-			}
-
+			// The bayes evaluation now handles penalties internally.
+			// We just need to reconstruct the `post` array for trait suggestion.
 			post = make([]float64, len(m.Taxa))
 			originalIndexMap := make(map[int]float64)
 			for _, s := range scores {
@@ -73,9 +55,18 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 		return nil, err
 	}
 
+	// Sort the final scores list by Post DESC
 	sort.Slice(scores, func(i, j int) bool {
 		return scores[i].Post > scores[j].Post
 	})
+
+	// Recalculate Delta based on the final sorted list
+	if len(scores) > 0 {
+		topScore := scores[0].Post
+		for i := range scores {
+			scores[i].Delta = topScore - scores[i].Post
+		}
+	}
 
 	var sugg []TraitSuggestion
 	if opt.WantInfoGain && post != nil {

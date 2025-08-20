@@ -51,8 +51,8 @@ export default function Ribbon(props: RibbonProps) {
   const {
     lang = "ja", setLang,
     keys, activeKey, onPickKey, onRefreshKeys,
-    mode: modeProp, setMode,
-    algo: algoProp, setAlgo,
+    mode, setMode,
+    algo, setAlgo,
     onHelp,
     themeMode = "dark", setThemeMode,
     layout, onLayoutChange,
@@ -64,21 +64,12 @@ export default function Ribbon(props: RibbonProps) {
   const PANEL_LABEL: Record<PanelKey, string> = T.panels;
 
   const [tab, setTab] = useState<TabKey | null>(null);
-  
-  // 親から受け取ったアルゴリズムの状態を管理
-  const handleAlgoChange = (newAlgo: "bayes" | "heuristic") => {
-    setAlgo?.(newAlgo);
-  };
-
-  const handleModeChange = (newMode: "lenient" | "strict") => {
-    setMode?.(newMode);
-  }
 
   const selectedCount = useMemo(() => {
     if (!selected) return 0;
     return Object.values(selected).filter(v => v !== 0 && v !== undefined && v !== null).length;
   }, [selected]);
-  
+
   const [debugOpen, setDebugOpen] = useState(false);
   const [lastReq, setLastReq] = useState<any | null>(null);
   const [lastRes, setLastRes] = useState<any | null>(null);
@@ -154,18 +145,18 @@ export default function Ribbon(props: RibbonProps) {
       <Collapse in={tab !== null}>
         <Box sx={{ px: 2, py: 2, borderTop: (t) => `1px solid ${t.palette.divider}`, bgcolor: 'background.default' }}>
           {tab === "overview" && (
-            <Stack spacing={2}>
-               <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-                <Typography variant="subtitle1">{T.ribbon.matrix}: <b>{matrixName || "(未選択)"}</b></Typography>
-                <Chip size="small" label={`${T.ribbon.selectedCount}: ${selectedCount}`} variant="outlined" />
-              </Stack>
-              <Typography variant="body2" color="text.secondary">{T.ribbon.description}</Typography>
-               <Button size="small" variant={debugOpen ? "contained" : "outlined"} color="secondary" startIcon={<BugReportIcon />} onClick={() => setDebugOpen(v => !v)} sx={{ alignSelf: 'flex-start' }}>
-                {T.ribbon.diagnosticPanel}
-              </Button>
+             <Stack spacing={2}>
+             <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+              <Typography variant="subtitle1">{T.ribbon.matrix}: <b>{matrixName || "(未選択)"}</b></Typography>
+              <Chip size="small" label={`${T.ribbon.selectedCount}: ${selectedCount}`} variant="outlined" />
             </Stack>
+            <Typography variant="body2" color="text.secondary">{T.ribbon.description}</Typography>
+             <Button size="small" variant={debugOpen ? "contained" : "outlined"} color="secondary" startIcon={<BugReportIcon />} onClick={() => setDebugOpen(v => !v)} sx={{ alignSelf: 'flex-start' }}>
+              {T.ribbon.diagnosticPanel}
+            </Button>
+          </Stack>
           )}
-          {tab === "algo" && <RibbonAlgoTab lang={lang} matrixName={matrixName} selected={selected} onApplied={onApplied} algorithm={algoProp} onAlgorithmChange={handleAlgoChange} mode={modeProp} onModeChange={handleModeChange} />}
+          {tab === "algo" && <RibbonAlgoTab lang={lang} matrixName={matrixName} selected={selected} onApplied={onApplied} algorithm={algo} onAlgorithmChange={setAlgo} mode={mode} onModeChange={setMode} />}
           {tab === "view" && (
             <Stack spacing={2} divider={<Divider flexItem />}>
               <Box>

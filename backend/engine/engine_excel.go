@@ -208,6 +208,9 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			taxonStartCol = idx + 1
 		}
 	}
+	if colIdxType == -1 {
+		taxonStartCol = 2 // Fallback for v1 format [Group] Trait
+	}
 
 	taxonNames := []string{}
 	taxonCols := []int{}
@@ -264,18 +267,18 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindNominal, kindOrdinal:
-			// (Same as before, just adding Cost and Parent to the derived traits)
 			states := spec.states
 			if len(states) == 0 {
 				uniq := map[string]struct{}{}
 				for _, col := range taxonCols {
 					raw := getCell(rows, r, col)
+					// Don't treat binary-like values (e.g., "1", "0", "Yes") as nominal states
 					if raw == "" || parseTernaryCell(raw) != NA {
 						continue
 					}
 					uniq[raw] = struct{}{}
 				}
-				if len(uniq) < 2 {
+				if len(uniq) < 2 { // Not enough unique states to be nominal, treat as binary
 					traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
 					m.Traits = append(m.Traits, Trait{ID: traitID, Name: traitName, Group: group, Type: "binary", Cost: costVal, Parent: parentName})
 					for i, col := range taxonCols {
@@ -289,6 +292,10 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				}
 				sort.Strings(states)
 			}
+
+			// Create a parent trait for the nominal group
+			parentTraitID := fmt.Sprintf("t%04d_parent", len(m.Traits)+1)
+			m.Traits = append(m.Traits, Trait{ID: parentTraitID, Name: traitName, Group: group, Type: "nominal_parent", Cost: costVal})
 
 			derivedIDs := make([]string, len(states))
 			for i, st := range states {
@@ -324,7 +331,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindContinuous:
-			// (Same as before, just adding Cost and Parent to derived traits)
+			// Continuous logic remains the same
 			values := make([]float64, len(taxonCols))
 			have := make([]bool, len(taxonCols))
 			minv, maxv := math.Inf(1), math.Inf(-1)
@@ -366,7 +373,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					Group: group, Type: "derived", Parent: traitName, State: label, Cost: costVal,
 				})
 			}
-			for i, colIdx := range taxonCols {
+			for i := range taxonCols {
 				idx := taxonIndex[taxonNames[i]]
 				if !have[i] {
 					for _, tid := range derivedIDs {
@@ -374,8 +381,8 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					}
 					continue
 				}
-				v := values[colIdx]
-				bin := 0
+				v := values[i]
+				bin := -1
 				for j := 0; j < bins; j++ {
 					last := (j == bins-1)
 					if (!last && v >= edges[j] && v < edges[j+1]) || (last && v >= edges[j] && v <= edges[j+1]) {

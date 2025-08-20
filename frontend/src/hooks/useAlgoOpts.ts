@@ -2,12 +2,12 @@
 import { useEffect, useState } from "react";
 
 export type AlgoOptions = {
-  defaultAlphaFP: number;  // α
-  defaultBetaFN:  number;  // β
-  gammaNAPenalty: number;  // γ
-  kappa:          number;  // κ
-  epsilonCut:     number;  // ε
-  useHardContradiction: boolean;
+  defaultAlphaFP: number;
+  defaultBetaFN:  number;
+  gammaNAPenalty: number;
+  kappa:          number;
+  epsilonCut:     number;
+  conflictPenalty: number; // Replaces useHardContradiction
   wantInfoGain?: boolean;
 };
 
@@ -17,7 +17,7 @@ export const DEFAULT_OPTS: AlgoOptions = {
   gammaNAPenalty: 0.95,
   kappa:          1.0,
   epsilonCut:     1e-6,
-  useHardContradiction: true,
+  conflictPenalty: 1.0, // Default to strict
   wantInfoGain: false,
 };
 
@@ -49,5 +49,6 @@ export function clampAlgoOptions(o: AlgoOptions): AlgoOptions {
     gammaNAPenalty: clamp(o.gammaNAPenalty, 0.8, 1.0),
     kappa:          clamp(o.kappa,          0, 5),
     epsilonCut:     clamp(o.epsilonCut,     1e-12, 1e-3),
+    conflictPenalty: clamp(o.conflictPenalty, 0, 1),
   };
 }

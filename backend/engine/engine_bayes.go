@@ -20,9 +20,9 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 		}
 		val, ok := m.Taxa[taxonIdx].Traits[traitID]
 		if !ok || val == NA {
-			return BayesTruth{Kind: BayesTraitBinary, K: 2, Unknown: true}, true
+			return BayesTruth{Kind: int(BayesTraitBinary), K: 2, Unknown: true}, true
 		}
-		return BayesTruth{Kind: BayesTraitBinary, K: 2, States: []int{int(val)}}, true
+		return BayesTruth{Kind: int(BayesTraitBinary), K: 2, States: []int{int(val)}}, true
 	}
 
 	getObs := func(traitID string) (BayesObservation, bool) {
@@ -30,10 +30,10 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 		if !ok || val == 0 {
 			return BayesObservation{IsNA: true}, false
 		}
-		return BayesObservation{Kind: BayesTraitBinary, K: 2, State: val}, true
+		return BayesObservation{Kind: int(BayesTraitBinary), K: 2, State: val}, true
 	}
 
-	ranked, err := EvaluateBayesA2FromOptions(nTaxa, traitIDs, getTruth, getObs, mode, opt)
+	ranked, err := EvaluateBayesA2FromOptions(nTaxa, traitIDs, getTruth, getObs, opt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -51,7 +51,7 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 		}
 		matches, support, conflicts := computeMatchStats(selectedTernary, &taxon)
 		scores[i] = TaxonScore{
-			Index:     r.Index, // Keep the original index
+			Index:     r.Index,
 			Taxon:     taxon,
 			Post:      r.Post,
 			Delta:     r.Delta,

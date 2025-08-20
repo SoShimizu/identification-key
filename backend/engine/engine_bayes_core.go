@@ -1,3 +1,4 @@
+// backend/engine/engine_bayes_core.go
 package engine
 
 import (
@@ -6,168 +7,117 @@ import (
 	"sort"
 )
 
-/*
-A2: log-domain Bayesian core (衝突回避版)
---------------------------------------
-- 既存プロジェクトの型（Matrix/Taxon/AlgoOptions）に依存しない。
-- 任意のデータ構造から Truth / Observation を callback で供給して使う。
-- Binary / Nominal（将来: Ordinal）に対応。
-*/
-
-// 種類（バイナリ / 多状態）
 type BayesTraitKind int
 
 const (
 	BayesTraitBinary BayesTraitKind = iota
 	BayesTraitNominal
-	BayesTraitOrdinal // 予約（距離重みなどの拡張用）
+	BayesTraitOrdinal
 )
 
-// タクサ側の真値分布（決定的 / 多態 / 未知）
 type BayesTruth struct {
-	Kind    BayesTraitKind
-	K       int
+	Kind, K int
 	Unknown bool
 	States  []int
 	Weights []float64
 }
-
-// 観測（単一 / 複数 / NA）
 type BayesObservation struct {
-	Kind   BayesTraitKind
-	K      int
-	IsNA   bool
-	State  int
-	Multi  []int
-	MultiW []float64
+	Kind, K int
+	IsNA    bool
+	State   int
+	Multi   []int
+	MultiW  []float64
 }
-
-// 既存行列と独立させるためのアクセサ
 type BayesTruthGetter func(taxonIdx int, traitID string) (BayesTruth, bool)
 type BayesObsGetter func(traitID string) (BayesObservation, bool)
-
-// 返却用
 type BayesRanked struct {
-	Index int
-	Post  float64
-	Delta float64
+	Index       int
+	Post, Delta float64
 }
 
-// ---- 内部ユーティリティ ----
+const largeNegativeLogLikelihood = -1e6 // Penalty base for conflicts
 
-func confusionSym(alpha float64, K int, same bool) float64 {
-	if K <= 1 {
-		return 1.0
+// logProbBinary calculates the log probability, now with a robust, interpolated conflict penalty.
+func logProbBinary(obs int, truth int, alpha, beta, conflictPenaltyFactor float64) float64 {
+	// Normalize inputs to 1 (Yes) and 0 (No) for consistent logic
+	obsNorm := 0
+	if obs == 1 {
+		obsNorm = 1
 	}
-	if same {
-		return 1.0 - alpha
+	truthNorm := 0
+	if truth == 1 {
+		truthNorm = 1
 	}
-	return alpha / float64(K-1)
-}
 
-func logProbBinary(obs int, truth int, alpha, beta float64, hard bool) float64 {
-	switch truth {
-	case 1:
-		if obs == 1 {
-			return math.Log(1.0 - beta)
+	isConflict := obsNorm != truthNorm
+
+	if isConflict {
+		// Calculate the standard log probability based on error rates (alpha/beta)
+		var standardLogProb float64
+		if obsNorm == 1 { // False Positive (obs=1, truth=0)
+			standardLogProb = math.Log(alpha)
+		} else { // False Negative (obs=0, truth=1)
+			standardLogProb = math.Log(beta)
 		}
-		if obs == 0 {
-			if hard {
-				return math.Inf(-1)
-			}
-			return math.Log(beta)
-		}
-	case 0:
-		if obs == 0 {
-			return math.Log(1.0 - alpha)
-		}
-		if obs == 1 {
-			if hard {
-				return math.Inf(-1)
-			}
-			return math.Log(alpha)
-		}
+
+		// Linearly interpolate between the standard probability and the large penalty
+		// When conflictPenaltyFactor is 0, we use the standard probability.
+		// When conflictPenaltyFactor is 1, we add the full large penalty.
+		// The penalty is scaled by the factor.
+		penalty := conflictPenaltyFactor * largeNegativeLogLikelihood
+
+		// The final score is a mix. If factor is 1, penalty dominates. If 0, it's just standard prob.
+		return (1-conflictPenaltyFactor)*standardLogProb + penalty
+	}
+
+	// No conflict
+	switch truthNorm {
+	case 1: // Truth is Yes
+		return math.Log(1.0 - beta)
+	case 0: // Truth is No
+		return math.Log(1.0 - alpha)
 	}
 	return 0
 }
 
-func pObsGivenStateNominal(obs BayesObservation, s int, alpha float64) float64 {
-	if obs.IsNA {
-		return 1.0
-	}
-	if len(obs.Multi) > 0 {
-		sum := 0.0
-		if len(obs.MultiW) == len(obs.Multi) && len(obs.Multi) > 0 {
-			for i, o := range obs.Multi {
-				sum += obs.MultiW[i] * confusionSym(alpha, obs.K, o == s)
-			}
-			return sum
-		}
-		for _, o := range obs.Multi {
-			sum += confusionSym(alpha, obs.K, o == s)
-		}
-		return sum
-	}
-	return confusionSym(alpha, obs.K, obs.State == s)
-}
-
-func logProbNominal(obs BayesObservation, truth BayesTruth, alpha, gamma float64, hard bool) float64 {
-	if obs.IsNA {
-		return 0
-	}
-	if hard && !truth.Unknown && len(truth.States) == 1 && len(obs.Multi) == 0 {
-		if obs.State != truth.States[0] {
-			return math.Inf(-1)
-		}
-	}
-	p := 0.0
-	switch {
-	case truth.Unknown:
-		if truth.K <= 0 {
-			return 0
-		}
-		base := 1.0 / float64(truth.K)
-		for s := 0; s < truth.K; s++ {
-			p += base * pObsGivenStateNominal(obs, s, alpha)
-		}
-		return math.Log(gamma) + math.Log(p)
-	case len(truth.States) <= 0:
-		return math.Log(gamma)
-	case len(truth.States) == 1:
-		p = pObsGivenStateNominal(obs, truth.States[0], alpha)
-		return math.Log(p)
-	default:
-		if len(truth.Weights) == len(truth.States) {
-			for i, s := range truth.States {
-				p += truth.Weights[i] * pObsGivenStateNominal(obs, s, alpha)
-			}
-		} else {
-			uni := 1.0 / float64(len(truth.States))
-			for _, s := range truth.States {
-				p += uni * pObsGivenStateNominal(obs, s, alpha)
-			}
-		}
-		return math.Log(p)
-	}
-}
-
 func softmaxWithKappa(logPost []float64, kappa, eps float64) []float64 {
 	n := len(logPost)
+	if n == 0 {
+		return []float64{}
+	}
 	maxLog := math.Inf(-1)
 	for _, v := range logPost {
-		if v > maxLog {
+		if !math.IsInf(v, -1) && v > maxLog {
 			maxLog = v
 		}
+	}
+	if math.IsInf(maxLog, -1) {
+		uniform := make([]float64, n)
+		for i := range uniform {
+			uniform[i] = 1.0 / float64(n)
+		}
+		return uniform
 	}
 	u := make([]float64, n)
 	sumU := 0.0
 	for i, v := range logPost {
+		if math.IsInf(v, -1) {
+			u[i] = 0
+			continue
+		}
 		val := math.Exp(v - maxLog)
 		if val < eps {
 			val = 0
 		}
 		u[i] = val
 		sumU += val
+	}
+	if sumU == 0 {
+		uniform := make([]float64, n)
+		for i := range uniform {
+			uniform[i] = 1.0 / float64(n)
+		}
+		return uniform
 	}
 	out := make([]float64, n)
 	den := sumU + kappa
@@ -181,17 +131,13 @@ func softmaxWithKappa(logPost []float64, kappa, eps float64) []float64 {
 	return out
 }
 
-// ---- 公開API（既存型に依存しない） ----
-
-// BayesEvalParams: AlgoOptions に依存しない素の引数
 type BayesEvalParams struct {
-	AlphaFP              float64 // α
-	BetaFN               float64 // β
-	GammaNAPenalty       float64 // γ
-	Kappa                float64 // κ
-	EpsilonCut           float64 // ε
-	UseHardContradiction bool
-	ModeStrict           bool // "strict" のとき true
+	AlphaFP         float64
+	BetaFN          float64
+	GammaNAPenalty  float64
+	Kappa           float64
+	EpsilonCut      float64
+	ConflictPenalty float64
 }
 
 func EvalBayesPosteriorGeneric(
@@ -205,6 +151,7 @@ func EvalBayesPosteriorGeneric(
 		return nil, errors.New("no taxa")
 	}
 	logPost := make([]float64, nTaxa)
+
 	for i := 0; i < nTaxa; i++ {
 		lp := 0.0
 		for _, tid := range traitIDs {
@@ -217,10 +164,8 @@ func EvalBayesPosteriorGeneric(
 				continue
 			}
 
-			switch obs.Kind {
-			case BayesTraitBinary:
-				switch {
-				case truth.Unknown:
+			if obs.Kind == int(BayesTraitBinary) {
+				if truth.Unknown {
 					var pr float64
 					if obs.State == 1 {
 						pr = 0.5*(1.0-p.BetaFN) + 0.5*p.AlphaFP
@@ -228,52 +173,36 @@ func EvalBayesPosteriorGeneric(
 						pr = 0.5*(1.0-p.AlphaFP) + 0.5*p.BetaFN
 					}
 					lp += math.Log(p.GammaNAPenalty) + math.Log(pr)
-				case len(truth.States) == 1:
-					lp += logProbBinary(obs.State, truth.States[0], p.AlphaFP, p.BetaFN, p.ModeStrict && p.UseHardContradiction)
-				default:
+				} else if len(truth.States) == 1 {
+					lp += logProbBinary(obs.State, truth.States[0], p.AlphaFP, p.BetaFN, p.ConflictPenalty)
+				} else {
 					pr := 0.0
-					if len(truth.Weights) == len(truth.States) {
-						for k, s := range truth.States {
-							if obs.State == 1 {
-								if s == 1 {
-									pr += truth.Weights[k] * (1.0 - p.BetaFN)
-								} else {
-									pr += truth.Weights[k] * p.AlphaFP
-								}
-							} else {
-								if s == 0 {
-									pr += truth.Weights[k] * (1.0 - p.AlphaFP)
-								} else {
-									pr += truth.Weights[k] * p.BetaFN
-								}
-							}
+					weightSum := 0.0
+					useWeights := len(truth.Weights) == len(truth.States)
+					for k, s := range truth.States {
+						weight := 1.0
+						if useWeights {
+							weight = truth.Weights[k]
 						}
-					} else {
-						uni := 1.0 / float64(len(truth.States))
-						for _, s := range truth.States {
-							if obs.State == 1 {
-								if s == 1 {
-									pr += uni * (1.0 - p.BetaFN)
-								} else {
-									pr += uni * p.AlphaFP
-								}
+						weightSum += weight
+						if obs.State == 1 {
+							if s == 1 {
+								pr += weight * (1.0 - p.BetaFN)
 							} else {
-								if s == 0 {
-									pr += uni * (1.0 - p.AlphaFP)
-								} else {
-									pr += uni * p.BetaFN
-								}
+								pr += weight * p.AlphaFP
+							}
+						} else {
+							if s == 0 {
+								pr += weight * (1.0 - p.AlphaFP)
+							} else {
+								pr += weight * p.BetaFN
 							}
 						}
 					}
-					lp += math.Log(pr)
+					if weightSum > 0 {
+						lp += math.Log(pr / weightSum)
+					}
 				}
-			case BayesTraitNominal, BayesTraitOrdinal:
-				lp += logProbNominal(obs, truth, p.AlphaFP, p.GammaNAPenalty, p.ModeStrict && p.UseHardContradiction)
-			}
-
-			if math.IsInf(lp, -1) {
-				break
 			}
 		}
 		logPost[i] = lp

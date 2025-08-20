@@ -61,13 +61,14 @@ type TraitSuggestion struct {
 }
 
 type AlgoOptions struct {
-	DefaultAlphaFP float64 `json:"defaultAlphaFP"`
-	DefaultBetaFN  float64 `json:"defaultBetaFN"`
-	WantInfoGain   bool    `json:"wantInfoGain"`
-	Lambda         float64 `json:"lambda"`
-	A0             float64 `json:"a0"`
-	B0             float64 `json:"b0"`
-	Kappa          float64 `json:"kappa"`
+	DefaultAlphaFP  float64 `json:"defaultAlphaFP"`
+	DefaultBetaFN   float64 `json:"defaultBetaFN"`
+	WantInfoGain    bool    `json:"wantInfoGain"`
+	Lambda          float64 `json:"lambda"`
+	A0              float64 `json:"a0"`
+	B0              float64 `json:"b0"`
+	Kappa           float64 `json:"kappa"`
+	ConflictPenalty float64 `json:"conflictPenalty"` // New field for adjustable penalty
 }
 
 type EvalResult struct {

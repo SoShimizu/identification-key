@@ -24,12 +24,7 @@ export async function applyFilters(
   // Wails が生成した型 main.ApplyOptions に詰め替え
   // （フィールド名が一致していればそのままスプレッドでOK。念のため unknown→型化）
   const opt4 = {
-    defaultAlphaFP: opts.defaultAlphaFP,
-    defaultBetaFN:  opts.defaultBetaFN,
-    gammaNAPenalty: opts.gammaNAPenalty,
-    kappa:          opts.kappa,
-    epsilonCut:     opts.epsilonCut,
-    useHardContradiction: opts.useHardContradiction,
+    ...opts,
     wantInfoGain:   opts.wantInfoGain ?? false,
   } as unknown as main.ApplyOptions;
 
