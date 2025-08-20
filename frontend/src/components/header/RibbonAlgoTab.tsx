@@ -1,4 +1,4 @@
-// frontend/src/components/RibbonAlgoTab.tsx
+// frontend/src/components/header/RibbonAlgoTab.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box, Button, Divider, FormControl, FormControlLabel, InputLabel,
@@ -7,40 +7,38 @@ import {
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { clampAlgoOptions, useAlgoOpts } from "../../hooks/useAlgoOpts";
 import { applyFilters } from "../../utils/applyFilters";
+import { STR } from "../../i18n";
 
-export type SelectionMap = Record<string, number>; // 形質ID -> -1/0/1 等（既存仕様に合わせて）
+export type SelectionMap = Record<string, number>;
 
 type Props = {
-  matrixName: string;                 // 現在のマトリクス名（保存キーに使用）
-  selected: SelectionMap;             // 現在の選択
-  onApplied?: (res: any) => void;     // Apply 後に結果（Scores/Suggestions 等）を親へ通知
-  defaultAlgorithm?: "bayes" | "heuristic";
-  defaultMode?: "strict" | "lenient";
-  autoApply?: boolean;                // 入力のたび自動適用（既定 true）
-  debounceMs?: number;                // 自動適用の遅延（既定 300ms）
+  matrixName: string;
+  selected: SelectionMap;
+  onApplied?: (res: any) => void;
+  algorithm?: "bayes" | "heuristic";
+  onAlgorithmChange: (algo: "bayes" | "heuristic") => void;
+  mode?: "strict" | "lenient";
+  onModeChange: (mode: "strict" | "lenient") => void;
+  autoApply?: boolean;
+  debounceMs?: number;
+  lang: "ja" | "en";
 };
 
 export default function RibbonAlgoTab(props: Props) {
   const {
-    matrixName,
-    selected,
-    onApplied,
-    defaultAlgorithm = "bayes",
-    defaultMode = "strict",
-    autoApply = true,
-    debounceMs = 300
+    matrixName, selected, onApplied, lang,
+    algorithm = "bayes", onAlgorithmChange,
+    mode = "strict", onModeChange,
+    autoApply = true, debounceMs = 300
   } = props;
 
+  const T = STR[lang].algoTab;
   const { opts, setOpts, reset } = useAlgoOpts(matrixName);
-  const [algorithm, setAlgorithm] = useState<"bayes"|"heuristic">(defaultAlgorithm);
-  const [mode, setMode] = useState<"strict"|"lenient">(defaultMode);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState<boolean>(autoApply);
 
-  // 入力値のクレンジング
   const sane = useMemo(() => clampAlgoOptions(opts), [opts]);
 
-  // 適用処理
   const doApply = async () => {
     setBusy(true);
     try {
@@ -51,7 +49,6 @@ export default function RibbonAlgoTab(props: Props) {
     }
   };
 
-  // 自動適用（パラメータ・モード・アルゴ・選択の変化を監視）
   const timer = useRef<number | null>(null);
   useEffect(() => {
     if (!auto) return;
@@ -72,199 +69,83 @@ export default function RibbonAlgoTab(props: Props) {
   const labelSx = { display:"flex", alignItems:"center", gap:0.5 };
 
   return (
-    <Box p={2}>
-      {/* 上部コントロール行 */}
+    <Box>
       <Stack direction={{ xs:"column", md:"row" }} spacing={2} alignItems="center">
         <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id="algo-label">アルゴリズム</InputLabel>
-          <Select
-            labelId="algo-label" label="アルゴリズム"
-            value={algorithm}
-            onChange={(e: SelectChangeEvent) => setAlgorithm(e.target.value as any)}
-          >
-            <MenuItem value="bayes">Bayes（A2）</MenuItem>
+          <InputLabel>{T.algorithm}</InputLabel>
+          <Select label={T.algorithm} value={algorithm} onChange={(e: SelectChangeEvent) => onAlgorithmChange(e.target.value as any)}>
+            <MenuItem value="bayes">Bayes (A2)</MenuItem>
             <MenuItem value="heuristic">Heuristic</MenuItem>
           </Select>
         </FormControl>
 
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id="mode-label">モード</InputLabel>
-          <Select
-            labelId="mode-label" label="モード"
-            value={mode}
-            onChange={(e: SelectChangeEvent) => setMode(e.target.value as any)}
-          >
-            <MenuItem value="strict">strict（矛盾を厳格に扱う）</MenuItem>
-            <MenuItem value="lenient">lenient（寛容）</MenuItem>
+        <FormControl size="small" sx={{ minWidth: 240 }}>
+          <InputLabel>{T.mode}</InputLabel>
+          <Select label={T.mode} value={mode} onChange={(e: SelectChangeEvent) => onModeChange(e.target.value as any)}>
+            <MenuItem value="strict">{T.mode_strict}</MenuItem>
+            <MenuItem value="lenient">{T.mode_lenient}</MenuItem>
           </Select>
         </FormControl>
 
-        <FormControlLabel
-          control={<Switch checked={auto} onChange={(_,c)=>setAuto(c)} />}
-          label="自動適用"
-        />
+        <FormControlLabel control={<Switch checked={auto} onChange={(_,c)=>setAuto(c)} />} label={T.auto_apply} />
 
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={doApply} disabled={busy || auto}>
-            手動適用
-          </Button>
-          <Button variant="text" onClick={reset} disabled={busy}>
-            既定に戻す
-          </Button>
+          <Button variant="outlined" onClick={doApply} disabled={busy || auto}>{T.manual_apply}</Button>
+          <Button variant="text" onClick={reset} disabled={busy}>{T.reset_defaults}</Button>
         </Stack>
       </Stack>
 
       <Divider sx={{ my: 2 }} />
 
-      {/* ここから下は CSS Grid（MUI Grid は使用しない） */}
-      <Box
-        sx={{
-          display: "grid",
-          gap: 2,
-          gridTemplateColumns: {
-            xs: "1fr",
-            md: "1fr 1fr",
-            lg: "1fr 1fr 1fr",
-          },
-          alignItems: "start",
-        }}
-      >
-        {/* α */}
-        <Box>
-          <Stack spacing={1}>
-            <Box sx={labelSx}>
-              <Typography variant="body2">α（偽陽性）</Typography>
-              <Tooltip title="truth=No を Yes と観測する誤り率。0〜0.2 推奨。">
-                <InfoOutlinedIcon fontSize="small" />
-              </Tooltip>
-            </Box>
-            <Slider
-              min={0} max={0.2} step={0.005}
-              value={sane.defaultAlphaFP}
-              onChange={(_, v) => setOpts({ ...opts, defaultAlphaFP: v as number })}
-              aria-label="alpha"
-            />
-            <TextField
-              size="small" type="number" value={sane.defaultAlphaFP}
-              onChange={onNum("defaultAlphaFP")}
-              inputProps={{ step: 0.005, min: 0, max: 0.2 }}
-            />
-          </Stack>
+      {algorithm === 'bayes' ? (
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr", lg: "1fr 1fr 1fr" }, alignItems: "start" }}>
+          {/* Bayes-specific parameters */}
+          <Box>
+            <Stack spacing={1}>
+              <Box sx={labelSx}><Typography variant="body2">{T.param_alpha}</Typography><Tooltip title={T.tooltip_alpha}><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <Slider min={0} max={0.2} step={0.005} value={sane.defaultAlphaFP} onChange={(_, v) => setOpts({ ...opts, defaultAlphaFP: v as number })} />
+              <TextField size="small" type="number" value={sane.defaultAlphaFP} onChange={onNum("defaultAlphaFP")} inputProps={{ step: 0.005, min: 0, max: 0.2 }} />
+            </Stack>
+          </Box>
+          <Box>
+            <Stack spacing={1}>
+              <Box sx={labelSx}><Typography variant="body2">{T.param_beta}</Typography><Tooltip title={T.tooltip_beta}><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <Slider min={0} max={0.2} step={0.005} value={sane.defaultBetaFN} onChange={(_, v) => setOpts({ ...opts, defaultBetaFN: v as number })} />
+              <TextField size="small" type="number" value={sane.defaultBetaFN} onChange={onNum("defaultBetaFN")} inputProps={{ step: 0.005, min: 0, max: 0.2 }} />
+            </Stack>
+          </Box>
+          <Box>
+            <Stack spacing={1}>
+              <Box sx={labelSx}><Typography variant="body2">{T.param_gamma}</Typography><Tooltip title={T.tooltip_gamma}><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <Slider min={0.8} max={1.0} step={0.01} value={sane.gammaNAPenalty} onChange={(_, v) => setOpts({ ...opts, gammaNAPenalty: v as number })} />
+              <TextField size="small" type="number" value={sane.gammaNAPenalty} onChange={onNum("gammaNAPenalty")} inputProps={{ step: 0.01, min: 0.8, max: 1.0 }} />
+            </Stack>
+          </Box>
+          <Box>
+            <Stack spacing={1}>
+              <Box sx={labelSx}><Typography variant="body2">{T.param_kappa}</Typography><Tooltip title={T.tooltip_kappa}><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <Slider min={0} max={5} step={0.1} value={sane.kappa} onChange={(_, v) => setOpts({ ...opts, kappa: v as number })} />
+              <TextField size="small" type="number" value={sane.kappa} onChange={onNum("kappa")} inputProps={{ step: 0.1, min: 0, max: 5 }} />
+            </Stack>
+          </Box>
+          <Box>
+            <Stack spacing={1}>
+              <Box sx={labelSx}><Typography variant="body2">{T.param_epsilon}</Typography><Tooltip title={T.tooltip_epsilon}><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <TextField size="small" type="number" value={sane.epsilonCut} onChange={onNum("epsilonCut")} inputProps={{ step: "any", min: 1e-12, max: 1e-3 }} />
+            </Stack>
+          </Box>
+          <Box>
+            <Stack spacing={1}>
+              <Box sx={labelSx}><Typography variant="body2">{T.param_hard_contradiction}</Typography><Tooltip title={T.tooltip_hard_contradiction}><InfoOutlinedIcon fontSize="small" /></Tooltip></Box>
+              <FormControlLabel control={<Switch checked={sane.useHardContradiction} onChange={onCheck("useHardContradiction")} />} label={sane.useHardContradiction ? "有効" : "無効"} />
+            </Stack>
+          </Box>
         </Box>
-
-        {/* β */}
-        <Box>
-          <Stack spacing={1}>
-            <Box sx={labelSx}>
-              <Typography variant="body2">β（偽陰性）</Typography>
-              <Tooltip title="truth=Yes を No と観測する誤り率。0〜0.2 推奨。">
-                <InfoOutlinedIcon fontSize="small" />
-              </Tooltip>
-            </Box>
-            <Slider
-              min={0} max={0.2} step={0.005}
-              value={sane.defaultBetaFN}
-              onChange={(_, v) => setOpts({ ...opts, defaultBetaFN: v as number })}
-              aria-label="beta"
-            />
-            <TextField
-              size="small" type="number" value={sane.defaultBetaFN}
-              onChange={onNum("defaultBetaFN")}
-              inputProps={{ step: 0.005, min: 0, max: 0.2 }}
-            />
-          </Stack>
-        </Box>
-
-        {/* γ */}
-        <Box>
-          <Stack spacing={1}>
-            <Box sx={labelSx}>
-              <Typography variant="body2">γ（NAペナルティ）</Typography>
-              <Tooltip title="truth=NA で Yes/No を観測した場合の軽い減点。0.8〜1.0。">
-                <InfoOutlinedIcon fontSize="small" />
-              </Tooltip>
-            </Box>
-            <Slider
-              min={0.8} max={1.0} step={0.01}
-              value={sane.gammaNAPenalty}
-              onChange={(_, v) => setOpts({ ...opts, gammaNAPenalty: v as number })}
-              aria-label="gamma"
-            />
-            <TextField
-              size="small" type="number" value={sane.gammaNAPenalty}
-              onChange={onNum("gammaNAPenalty")}
-              inputProps={{ step: 0.01, min: 0.8, max: 1.0 }}
-            />
-          </Stack>
-        </Box>
-
-        {/* κ */}
-        <Box>
-          <Stack spacing={1}>
-            <Box sx={labelSx}>
-              <Typography variant="body2">κ（平滑化）</Typography>
-              <Tooltip title="事後分布の均し。過信抑制に有効。0〜5。">
-                <InfoOutlinedIcon fontSize="small" />
-              </Tooltip>
-            </Box>
-            <Slider
-              min={0} max={5} step={0.1}
-              value={sane.kappa}
-              onChange={(_, v) => setOpts({ ...opts, kappa: v as number })}
-              aria-label="kappa"
-            />
-            <TextField
-              size="small" type="number" value={sane.kappa}
-              onChange={onNum("kappa")}
-              inputProps={{ step: 0.1, min: 0, max: 5 }}
-            />
-          </Stack>
-        </Box>
-
-        {/* ε */}
-        <Box>
-          <Stack spacing={1}>
-            <Box sx={labelSx}>
-              <Typography variant="body2">ε（丸め閾値）</Typography>
-              <Tooltip title="極小確率を 0 に丸める数値安定化。1e-12〜1e-3。">
-                <InfoOutlinedIcon fontSize="small" />
-              </Tooltip>
-            </Box>
-            <TextField
-              size="small" type="number" value={sane.epsilonCut}
-              onChange={onNum("epsilonCut")}
-              inputProps={{ step: "any", min: 1e-12, max: 1e-3 }}
-            />
-          </Stack>
-        </Box>
-
-        {/* ハード矛盾 */}
-        <Box>
-          <Stack spacing={1}>
-            <Box sx={labelSx}>
-              <Typography variant="body2">ハード矛盾除外</Typography>
-              <Tooltip title="strict時、明確な矛盾を即時除外します。">
-                <InfoOutlinedIcon fontSize="small" />
-              </Tooltip>
-            </Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={sane.useHardContradiction}
-                  onChange={onCheck("useHardContradiction")}
-                />
-              }
-              label={sane.useHardContradiction ? "有効" : "無効"}
-            />
-          </Stack>
-        </Box>
-      </Box>
-
-      <Divider sx={{ my: 2 }} />
-
-      <Typography variant="caption" color="text.secondary">
-        変更は {auto ? "自動的に適用されます" : "「手動適用」ボタンで適用します"}。パラメータはマトリクス「{matrixName}」ごとに保存されます。
-      </Typography>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+            ヒューリスティックモードには、現在調整可能なパラメータはありません。
+        </Typography>
+      )}
     </Box>
   );
 }

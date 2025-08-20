@@ -12,20 +12,15 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BugReportIcon from "@mui/icons-material/BugReport";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SettingsIcon from '@mui/icons-material/Settings';
+import TranslateIcon from '@mui/icons-material/Translate';
 
 import RibbonAlgoTab from "./RibbonAlgoTab";
 import { applyFilters } from "../../utils/applyFilters";
+import { STR } from "../../i18n";
 
 import type { LayoutState, PanelKey } from "../../App";
 
 type KeyInfoLike = { name: string; path?: string };
-
-const PANEL_LABEL: Record<PanelKey, string> = {
-  candidates: "候補タクサ",
-  traits_unselected: "未選択の形質",
-  traits_selected: "選択済みの形質",
-  history: "選択履歴",
-};
 
 export type RibbonProps = {
   lang?: "ja" | "en";
@@ -65,12 +60,19 @@ export default function Ribbon(props: RibbonProps) {
     matrixName, selected, onApplied,
   } = props;
 
+  const T = STR[lang];
+  const PANEL_LABEL: Record<PanelKey, string> = T.panels;
+
   const [tab, setTab] = useState<TabKey | null>(null);
-  const [localAlgo, setLocalAlgo] = useState<"bayes" | "heuristic">(algoProp ?? "bayes");
-  const [localMode, setLocalMode] = useState<"lenient" | "strict">(modeProp ?? "lenient");
   
-  React.useEffect(() => { if (algoProp !== undefined) setLocalAlgo(algoProp); }, [algoProp]);
-  React.useEffect(() => { if (modeProp !== undefined) setLocalMode(modeProp); }, [modeProp]);
+  // 親から受け取ったアルゴリズムの状態を管理
+  const handleAlgoChange = (newAlgo: "bayes" | "heuristic") => {
+    setAlgo?.(newAlgo);
+  };
+
+  const handleModeChange = (newMode: "lenient" | "strict") => {
+    setMode?.(newMode);
+  }
 
   const selectedCount = useMemo(() => {
     if (!selected) return 0;
@@ -117,18 +119,35 @@ export default function Ribbon(props: RibbonProps) {
         onMouseLeave={() => setTab(null)}
     >
       <Toolbar sx={{ px: 2, minHeight: 48, gap: 2 }}>
-        <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold" }}>MorphoKey</Typography>
+        <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold" }}>{T.appTitle}</Typography>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
-          <Tab onMouseEnter={() => setTab("overview")} icon={<InfoOutlinedIcon />} iconPosition="start" label="概要" value="overview" />
-          <Tab onMouseEnter={() => setTab("algo")} icon={<TuneIcon />} iconPosition="start" label="アルゴリズム" value="algo" />
-          <Tab onMouseEnter={() => setTab("view")} icon={<SettingsIcon />} iconPosition="start" label="表示設定" value="view" />
+          <Tab onMouseEnter={() => setTab("overview")} icon={<InfoOutlinedIcon />} iconPosition="start" label={T.ribbon.overview} value="overview" />
+          <Tab onMouseEnter={() => setTab("algo")} icon={<TuneIcon />} iconPosition="start" label={T.ribbon.algorithm} value="algo" />
+          <Tab onMouseEnter={() => setTab("view")} icon={<SettingsIcon />} iconPosition="start" label={T.ribbon.viewSettings} value="view" />
         </Tabs>
         <Box sx={{ flex: 1 }} />
-        <Tooltip title="ヘルプ">
-            <IconButton onClick={onHelp}><HelpOutlineIcon /></IconButton>
-        </Tooltip>
-        <Tooltip title={themeMode === 'dark' ? "ライトモードに切り替え" : "ダークモードに切り替え"}>
+        {onPickKey && (
+          <FormControl size="small" sx={{ minWidth: 240, mr: 1 }}>
+            <InputLabel>{T.ribbon.switchMatrix}</InputLabel>
+            <Select label={T.ribbon.switchMatrix} value={activeKey || ""} onChange={(e) => onPickKey(String(e.target.value))}>
+              {(keys || []).map((k) => <MenuItem key={k.name} value={k.name}>{k.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+        {setLang && (
+            <FormControl size="small" variant="outlined" sx={{ minWidth: 140 }}>
+                <InputLabel>Language</InputLabel>
+                <Select label="Language" value={lang} onChange={(e) => setLang(e.target.value as "ja" | "en")} startAdornment={<TranslateIcon fontSize="small" sx={{mr: 1, color: 'action.active'}}/>}>
+                <MenuItem value="ja">日本語</MenuItem>
+                <MenuItem value="en">English</MenuItem>
+                </Select>
+            </FormControl>
+        )}
+        <Tooltip title={T.ribbon.switchTheme}>
             <Switch checked={themeMode === 'dark'} onChange={(e) => setThemeMode?.(e.target.checked ? 'dark' : 'light')} />
+        </Tooltip>
+        <Tooltip title={T.ribbon.help}>
+            <IconButton onClick={onHelp}><HelpOutlineIcon /></IconButton>
         </Tooltip>
       </Toolbar>
 
@@ -137,52 +156,16 @@ export default function Ribbon(props: RibbonProps) {
           {tab === "overview" && (
             <Stack spacing={2}>
                <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-                <Typography variant="subtitle1">マトリクス: <b>{matrixName || "(未選択)"}</b></Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Chip size="small" label={`選択数: ${selectedCount}`} variant="outlined" />
-                  {onPickKey && (
-                    <FormControl size="small" sx={{ minWidth: 240 }}>
-                      <InputLabel>マトリクス切替</InputLabel>
-                      <Select label="マトリクス切替" value={activeKey || ""} onChange={(e) => onPickKey(String(e.target.value))}>
-                        {(keys || []).map((k) => <MenuItem key={k.name} value={k.name}>{k.name}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-                  )}
-                  {onRefreshKeys && <Tooltip title="一覧を再取得"><IconButton size="small" onClick={onRefreshKeys}><RefreshIcon /></IconButton></Tooltip>}
-                </Stack>
+                <Typography variant="subtitle1">{T.ribbon.matrix}: <b>{matrixName || "(未選択)"}</b></Typography>
+                <Chip size="small" label={`${T.ribbon.selectedCount}: ${selectedCount}`} variant="outlined" />
               </Stack>
-              <Typography variant="body2" color="text.secondary">
-                「アルゴリズム」タブから評価方法やパラメータを調整できます。設定はマトリクスごとに自動保存されます。
-              </Typography>
+              <Typography variant="body2" color="text.secondary">{T.ribbon.description}</Typography>
                <Button size="small" variant={debugOpen ? "contained" : "outlined"} color="secondary" startIcon={<BugReportIcon />} onClick={() => setDebugOpen(v => !v)} sx={{ alignSelf: 'flex-start' }}>
-                診断パネル
+                {T.ribbon.diagnosticPanel}
               </Button>
-              <Collapse in={debugOpen}>
-                <Box sx={{ p: 2, bgcolor: "background.paper", border: (t)=>`1px solid ${t.palette.divider}`, borderRadius: 2 }}>
-                  <Stack spacing={2}>
-                    <Typography variant="subtitle2">A2 診断ツール</Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                      <Button size="small" variant="outlined" disabled={busy} onClick={() => runDiagnostic({ selected, mode: localMode, algorithm: localAlgo })}>現在の選択で実行</Button>
-                      <Button size="small" variant="outlined" disabled={busy} onClick={() => runDiagnostic({ selected: {}, mode: "strict", algorithm: "bayes" })}>空選択 (Bayes/strict)</Button>
-                    </Stack>
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                      <Box sx={{ flex: 1, width: '100%' }}>
-                        <Typography variant="caption" color="text.secondary">リクエスト</Typography>
-                        <Box component="pre" sx={{ m: 0, p: 1, bgcolor: 'action.hover', borderRadius: 1, maxHeight: 120, overflow: "auto", fontSize: '0.75rem' }}>{JSON.stringify(lastReq, null, 2)}</Box>
-                        <Button size="small" startIcon={<ContentCopyIcon />} onClick={() => copyJson(lastReq)} sx={{ mt: 0.5 }}>コピー</Button>
-                      </Box>
-                      <Box sx={{ flex: 1, width: '100%' }}>
-                        <Typography variant="caption" color="text.secondary">レスポンス</Typography>
-                        <Box component="pre" sx={{ m: 0, p: 1, bgcolor: 'action.hover', borderRadius: 1, maxHeight: 120, overflow: "auto", fontSize: '0.75rem' }}>{JSON.stringify(lastRes, null, 2)}</Box>
-                        <Button size="small" startIcon={<ContentCopyIcon />} onClick={() => copyJson(lastRes)} sx={{ mt: 0.5 }}>コピー</Button>
-                      </Box>
-                    </Stack>
-                  </Stack>
-                </Box>
-              </Collapse>
             </Stack>
           )}
-          {tab === "algo" && <RibbonAlgoTab matrixName={matrixName} selected={selected} onApplied={onApplied} defaultAlgorithm={localAlgo} defaultMode={localMode} />}
+          {tab === "algo" && <RibbonAlgoTab lang={lang} matrixName={matrixName} selected={selected} onApplied={onApplied} algorithm={algoProp} onAlgorithmChange={handleAlgoChange} mode={modeProp} onModeChange={handleModeChange} />}
           {tab === "view" && (
             <Stack spacing={2} divider={<Divider flexItem />}>
               <Box>
@@ -201,15 +184,6 @@ export default function Ribbon(props: RibbonProps) {
               <Box>
                  <Typography variant="subtitle2" gutterBottom>表示オプション</Typography>
                 <FormControlLabel control={<Switch checked={showMatchSupport} onChange={(e) => setShowMatchSupport?.(e.target.checked)} />} label="Match/Support 列を表示" />
-                {setLang && (
-                    <FormControl size="small" sx={{ minWidth: 140, ml: 2 }}>
-                        <InputLabel>言語</InputLabel>
-                        <Select label="言語" value={lang} onChange={(e) => setLang(e.target.value as "ja" | "en")}>
-                        <MenuItem value="ja">日本語</MenuItem>
-                        <MenuItem value="en">English</MenuItem>
-                        </Select>
-                    </FormControl>
-                )}
               </Box>
             </Stack>
           )}

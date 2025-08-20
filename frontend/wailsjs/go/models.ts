@@ -23,6 +23,7 @@ export namespace engine {
 	    type: string;
 	    parent?: string;
 	    state?: string;
+	    cost?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Trait(source);
@@ -36,6 +37,7 @@ export namespace engine {
 	        this.type = source["type"];
 	        this.parent = source["parent"];
 	        this.state = source["state"];
+	        this.cost = source["cost"];
 	    }
 	}
 	export class Matrix {
@@ -88,6 +90,7 @@ export namespace engine {
 	}
 	
 	export class TaxonScore {
+	    index: number;
 	    taxon: Taxon;
 	    post: number;
 	    delta: number;
@@ -102,6 +105,7 @@ export namespace engine {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
 	        this.taxon = this.convertValues(source["taxon"], Taxon);
 	        this.post = source["post"];
 	        this.delta = source["delta"];

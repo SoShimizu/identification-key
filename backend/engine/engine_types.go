@@ -1,6 +1,5 @@
+// backend/engine/engine_types.go
 package engine
-
-// ==== 基本型 & 公開構造体（Wails/TSに渡る） ====
 
 type Ternary int8
 
@@ -11,12 +10,13 @@ const (
 )
 
 type Trait struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Group  string `json:"group"`
-	Type   string `json:"type"`             // "binary" | "derived"
-	Parent string `json:"parent,omitempty"` // derived の親（名前/IDどちらでも）
-	State  string `json:"state,omitempty"`  // 派生の状態ラベル
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Group  string  `json:"group"`
+	Type   string  `json:"type"`
+	Parent string  `json:"parent,omitempty"`
+	State  string  `json:"state,omitempty"`
+	Cost   float64 `json:"cost,omitempty"`
 }
 
 type Taxon struct {
@@ -31,49 +31,45 @@ type Matrix struct {
 	Taxa   []Taxon `json:"taxa"`
 }
 
-// 候補タクサの行
 type TaxonScore struct {
+	Index     int     `json:"index"` // The original index in Matrix.Taxa
 	Taxon     Taxon   `json:"taxon"`
-	Post      float64 `json:"post"`      // 事後
-	Delta     float64 `json:"delta"`     // 1位との差
-	Used      int     `json:"used"`      // 使用観測数
-	Conflicts int     `json:"conflicts"` // 矛盾数
-	Match     int     `json:"match"`     // 一致
-	Support   int     `json:"support"`   // 分母
+	Post      float64 `json:"post"`
+	Delta     float64 `json:"delta"`
+	Used      int     `json:"used"`
+	Conflicts int     `json:"conflicts"`
+	Match     int     `json:"match"`
+	Support   int     `json:"support"`
 }
 
-// 推奨の状態出現確率
 type StateProb struct {
 	State string  `json:"state"`
 	P     float64 `json:"p"`
 }
 
-// 「次に効く形質」
 type TraitSuggestion struct {
 	TraitId string      `json:"traitId"`
 	Name    string      `json:"name"`
 	Group   string      `json:"group"`
-	IG      float64     `json:"ig"`      // 情報利得
-	ECR     float64     `json:"ecr"`     // 期待候補削減率
-	Gini    float64     `json:"gini"`    // 1-Σp^2
-	Entropy float64     `json:"entropy"` // H
-	PStates []StateProb `json:"pStates"` // 状態分布
+	IG      float64     `json:"ig"`
+	ECR     float64     `json:"ecr"`
+	Gini    float64     `json:"gini"`
+	Entropy float64     `json:"entropy"`
+	PStates []StateProb `json:"pStates"`
 	Cost    float64     `json:"cost,omitempty"`
-	Score   float64     `json:"score"` // 並べ替え用（既定=IG）
+	Score   float64     `json:"score"`
 }
 
-// モード/アルゴ & パラメータ
 type AlgoOptions struct {
-	DefaultAlphaFP float64 `json:"defaultAlphaFP"` // 偽陽性 P(obs=Yes | truth=No)
-	DefaultBetaFN  float64 `json:"defaultBetaFN"`  // 偽陰性 P(obs=No  | truth=Yes)
+	DefaultAlphaFP float64 `json:"defaultAlphaFP"`
+	DefaultBetaFN  float64 `json:"defaultBetaFN"`
 	WantInfoGain   bool    `json:"wantInfoGain"`
-	Lambda         float64 `json:"lambda"` // 予備
-	A0             float64 `json:"a0"`     // 予備（経験ベイズの超パラ用途）
+	Lambda         float64 `json:"lambda"`
+	A0             float64 `json:"a0"`
 	B0             float64 `json:"b0"`
 	Kappa          float64 `json:"kappa"`
 }
 
-// 評価結果
 type EvalResult struct {
 	Scores      []TaxonScore      `json:"scores"`
 	Suggestions []TraitSuggestion `json:"suggestions"`

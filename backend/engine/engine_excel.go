@@ -1,3 +1,4 @@
+// backend/engine/engine_excel.go
 package engine
 
 import (
@@ -50,10 +51,13 @@ func parseTernaryCell(s string) Ternary {
 }
 
 func getCell(rows [][]string, r, c int) string {
+	if c < 0 {
+		return ""
+	}
 	if r < 0 || r >= len(rows) {
 		return ""
 	}
-	if c < 0 || c >= len(rows[r]) {
+	if c >= len(rows[r]) {
 		return ""
 	}
 	return strings.TrimSpace(rows[r][c])
@@ -162,14 +166,6 @@ func binLabel(a, b float64, last bool) string {
 	return fmt.Sprintf("[%.4g～%.4g)", a, b)
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// v2: A=Group, B=Trait, C=Type, D~taxa
 func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	f, err := excelize.OpenFile(path)
 	if err != nil {
@@ -187,14 +183,36 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	}
 
 	header := rows[0]
-	if len(header) < 4 {
-		return nil, errors.New("need v2 header: Group, Trait, Type, Taxa...")
+	colIdxGroup, colIdxTrait, colIdxType, colIdxCost, colIdxParent := -1, -1, -1, -1, -1
+	for i, h := range header {
+		switch strings.ToLower(strings.TrimSpace(h)) {
+		case "group":
+			colIdxGroup = i
+		case "trait":
+			colIdxTrait = i
+		case "type":
+			colIdxType = i
+		case "cost":
+			colIdxCost = i
+		case "parent":
+			colIdxParent = i
+		}
+	}
+	if colIdxTrait == -1 {
+		return nil, errors.New("header must contain 'Trait' column")
+	}
+
+	taxonStartCol := 0
+	for _, idx := range []int{colIdxGroup, colIdxTrait, colIdxType, colIdxCost, colIdxParent} {
+		if idx+1 > taxonStartCol {
+			taxonStartCol = idx + 1
+		}
 	}
 
 	taxonNames := []string{}
 	taxonCols := []int{}
 	seen := map[string]int{}
-	for c := 3; c < len(header); c++ {
+	for c := taxonStartCol; c < len(header); c++ {
 		name := strings.TrimSpace(header[c])
 		if name == "" {
 			continue
@@ -216,34 +234,28 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	m.Traits = []Trait{}
 	m.Taxa = []Taxon{}
 	taxonIndex := map[string]int{}
-	addTaxon := func(name string) int {
-		if i, ok := taxonIndex[name]; ok {
-			return i
-		}
-		i := len(m.Taxa)
-		m.Taxa = append(m.Taxa, Taxon{ID: name, Name: name, Traits: map[string]Ternary{}})
-		taxonIndex[name] = i
-		return i
-	}
-	for _, nm := range taxonNames {
-		addTaxon(nm)
+	for i, nm := range taxonNames {
+		m.Taxa = append(m.Taxa, Taxon{ID: nm, Name: nm, Traits: map[string]Ternary{}})
+		taxonIndex[nm] = i
 	}
 
 	for r := 1; r < len(rows); r++ {
-		group := strings.TrimSpace(getCell(rows, r, 0))
-		traitName := strings.TrimSpace(getCell(rows, r, 1))
-		if traitName == "" && group == "" {
-			continue
-		}
+		group := getCell(rows, r, colIdxGroup)
+		traitName := getCell(rows, r, colIdxTrait)
 		if traitName == "" {
 			continue
 		}
-		spec := parseTypeSpec(strings.TrimSpace(getCell(rows, r, 2)))
+		spec := parseTypeSpec(getCell(rows, r, colIdxType))
+		costVal, err := strconv.ParseFloat(getCell(rows, r, colIdxCost), 64)
+		if err != nil || costVal <= 0 {
+			costVal = 1.0
+		}
+		parentName := getCell(rows, r, colIdxParent)
 
 		switch spec.kind {
 		case kindBinary:
 			traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
-			m.Traits = append(m.Traits, Trait{ID: traitID, Name: traitName, Group: group, Type: "binary"})
+			m.Traits = append(m.Traits, Trait{ID: traitID, Name: traitName, Group: group, Type: "binary", Cost: costVal, Parent: parentName})
 			for i, col := range taxonCols {
 				valStr := getCell(rows, r, col)
 				val := parseTernaryCell(valStr)
@@ -252,27 +264,23 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindNominal, kindOrdinal:
+			// (Same as before, just adding Cost and Parent to the derived traits)
 			states := spec.states
 			if len(states) == 0 {
 				uniq := map[string]struct{}{}
 				for _, col := range taxonCols {
-					raw := strings.TrimSpace(getCell(rows, r, col))
-					if raw == "" {
-						continue
-					}
-					if parseTernaryCell(raw) != NA {
+					raw := getCell(rows, r, col)
+					if raw == "" || parseTernaryCell(raw) != NA {
 						continue
 					}
 					uniq[raw] = struct{}{}
 				}
 				if len(uniq) < 2 {
 					traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
-					m.Traits = append(m.Traits, Trait{ID: traitID, Name: traitName, Group: group, Type: "binary"})
+					m.Traits = append(m.Traits, Trait{ID: traitID, Name: traitName, Group: group, Type: "binary", Cost: costVal, Parent: parentName})
 					for i, col := range taxonCols {
-						valStr := getCell(rows, r, col)
-						val := parseTernaryCell(valStr)
-						idx := taxonIndex[taxonNames[i]]
-						m.Taxa[idx].Traits[traitID] = val
+						val := parseTernaryCell(getCell(rows, r, col))
+						m.Taxa[taxonIndex[taxonNames[i]]].Traits[traitID] = val
 					}
 					continue
 				}
@@ -281,52 +289,49 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				}
 				sort.Strings(states)
 			}
+
 			derivedIDs := make([]string, len(states))
 			for i, st := range states {
 				tid := fmt.Sprintf("t%04d", len(m.Traits)+1)
 				derivedIDs[i] = tid
 				m.Traits = append(m.Traits, Trait{
 					ID: tid, Name: fmt.Sprintf("%s = %s", traitName, st),
-					Group: group, Type: "derived", Parent: traitName, State: st,
+					Group: group, Type: "derived", Parent: traitName, State: st, Cost: costVal,
 				})
 			}
 			for i, col := range taxonCols {
-				raw := strings.TrimSpace(getCell(rows, r, col))
+				raw := getCell(rows, r, col)
 				which := -1
 				for j, st := range states {
-					if strings.EqualFold(strings.TrimSpace(st), raw) {
+					if strings.EqualFold(st, raw) {
 						which = j
 						break
 					}
 				}
 				idx := taxonIndex[taxonNames[i]]
+				for j, tid := range derivedIDs {
+					if which == j {
+						m.Taxa[idx].Traits[tid] = Yes
+					} else {
+						m.Taxa[idx].Traits[tid] = No
+					}
+				}
 				if which < 0 {
 					for _, tid := range derivedIDs {
 						m.Taxa[idx].Traits[tid] = NA
-					}
-				} else {
-					for j, tid := range derivedIDs {
-						if j == which {
-							m.Taxa[idx].Traits[tid] = Yes
-						} else {
-							m.Taxa[idx].Traits[tid] = No
-						}
 					}
 				}
 			}
 
 		case kindContinuous:
+			// (Same as before, just adding Cost and Parent to derived traits)
 			values := make([]float64, len(taxonCols))
 			have := make([]bool, len(taxonCols))
 			minv, maxv := math.Inf(1), math.Inf(-1)
 			for i, col := range taxonCols {
-				raw := strings.TrimSpace(getCell(rows, r, col))
-				if raw == "" {
-					continue
-				}
+				raw := getCell(rows, r, col)
 				if v, err := strconv.ParseFloat(strings.ReplaceAll(toHalfWidthNums(raw), ",", ""), 64); err == nil {
-					values[i] = v
-					have[i] = true
+					values[i], have[i] = v, true
 					if v < minv {
 						minv = v
 					}
@@ -350,6 +355,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			for i := 0; i <= bins; i++ {
 				edges[i] = min + (max-min)*float64(i)/float64(bins)
 			}
+
 			derivedIDs := make([]string, bins)
 			for i := 0; i < bins; i++ {
 				tid := fmt.Sprintf("t%04d", len(m.Traits)+1)
@@ -357,10 +363,10 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				label := binLabel(edges[i], edges[i+1], i == bins-1)
 				m.Traits = append(m.Traits, Trait{
 					ID: tid, Name: fmt.Sprintf("%s = %s", traitName, label),
-					Group: group, Type: "derived", Parent: traitName, State: label,
+					Group: group, Type: "derived", Parent: traitName, State: label, Cost: costVal,
 				})
 			}
-			for i := range taxonCols {
+			for i, colIdx := range taxonCols {
 				idx := taxonIndex[taxonNames[i]]
 				if !have[i] {
 					for _, tid := range derivedIDs {
@@ -368,7 +374,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					}
 					continue
 				}
-				v := values[i]
+				v := values[colIdx]
 				bin := 0
 				for j := 0; j < bins; j++ {
 					last := (j == bins-1)
@@ -378,11 +384,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					}
 				}
 				for j, tid := range derivedIDs {
-					if j == bin {
-						m.Taxa[idx].Traits[tid] = Yes
-					} else {
-						m.Taxa[idx].Traits[tid] = No
-					}
+					m.Taxa[idx].Traits[tid] = Nary(j == bin)
 				}
 			}
 		}
@@ -393,4 +395,12 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 		return sum, errors.New("parsed zero traits or taxa")
 	}
 	return sum, nil
+}
+
+// Helper to convert bool to Ternary
+func Nary(b bool) Ternary {
+	if b {
+		return Yes
+	}
+	return No
 }

@@ -1,4 +1,4 @@
-// frontend/src/components/HelpModal.tsx
+// frontend/src/components/help/HelpModal.tsx
 import React from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,

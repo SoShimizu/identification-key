@@ -1,18 +1,17 @@
 // frontend/src/App.tsx
 import React from "react";
-import { CssBaseline, ThemeProvider, createTheme, Box } from "@mui/material";
+import { CssBaseline, ThemeProvider, createTheme, Box, Chip } from "@mui/material";
 import { useMatrix } from "./hooks/useMatrix";
 import Ribbon from "./components/header/Ribbon";
 import TraitsPanel from "./components/panels/traits/TraitsPanel";
 import HistoryPanel from "./components/panels/history/HistoryPanel";
 import CandidatesPanel, { EngineScore } from "./components/panels/candidates/CandidatesPanel";
+import { STR } from "./i18n";
 
-// Add Google Font link to HTML Head
 const fontLink = document.createElement('link');
 fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
 fontLink.rel = 'stylesheet';
 document.head.appendChild(fontLink);
-
 
 export type PanelKey = "candidates" | "traits_unselected" | "traits_selected" | "history";
 export type LayoutState = { tl: PanelKey; tr: PanelKey; bl: PanelKey; br: PanelKey };
@@ -32,7 +31,6 @@ function loadLayout(): LayoutState {
     return DEFAULT_LAYOUT;
   }
 }
-
 function saveLayout(v: LayoutState) {
   localStorage.setItem("mk.layout.v2", JSON.stringify(v));
 }
@@ -52,20 +50,16 @@ export default function App() {
   const [showMatchSupport, setShowMatchSupport] = React.useState<boolean>(false);
   const [lang, setLang] = React.useState<"ja" | "en">("ja");
 
+  const T = STR[lang];
+
   const theme = React.useMemo(
     () => createTheme({
       palette: {
         mode: themeMode,
         ...(themeMode === 'dark' ? {
-          background: {
-            default: '#0c111c', // A slightly darker background
-            paper: '#1f2937',
-          },
+          background: { default: '#0c111c', paper: '#1f2937' },
         } : {
-          background: {
-            default: '#f8f9fa', // A slightly off-white background
-            paper: '#ffffff',
-          }
+          background: { default: '#f8f9fa', paper: '#ffffff' },
         })
       },
       typography: {
@@ -74,13 +68,7 @@ export default function App() {
         h6: { fontWeight: 700 },
       },
       components: {
-        MuiPaper: {
-          styleOverrides: {
-            root: {
-              backgroundImage: 'none',
-            }
-          }
-        }
+        MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } }
       }
     }),
     [themeMode]
@@ -108,20 +96,17 @@ export default function App() {
     }));
   }, [scores]);
 
-  const handleApplied = (res: any) => {
-    console.log("Applied results received in App.tsx", res);
-  };
-
   const renderPanel = (k: PanelKey) => {
     switch (k) {
       case "candidates":
-        return <CandidatesPanel title="候補タクサ" rows={candRows} totalTaxa={taxaCount || 0} showMatchSupport={showMatchSupport} />;
+        return <CandidatesPanel lang={lang} title={T.panels.candidates} rows={candRows} totalTaxa={taxaCount || 0} showMatchSupport={showMatchSupport} />;
       case "history":
-        return <HistoryPanel title="選択履歴" items={history as any} />;
+        return <HistoryPanel title={T.panels.history} items={history as any} />;
       case "traits_unselected":
         return (
           <TraitsPanel
-            title="未選択の形質"
+            lang={lang}
+            title={T.panels.traits_unselected}
             mode="unselected"
             rows={rows}
             selected={selected as Record<string, number>}
@@ -132,14 +117,13 @@ export default function App() {
             setSortBy={setSortBy}
             suggMap={suggMap}
             suggRank={suggRank}
-            suggAlgo={suggAlgo}
-            setSuggAlgo={(a) => setSuggAlgo(a)}
           />
         );
       case "traits_selected":
         return (
           <TraitsPanel
-            title="選択済みの形質"
+            lang={lang}
+            title={T.panels.traits_selected}
             mode="selected"
             rows={rows}
             selected={selected as Record<string, number>}
@@ -150,29 +134,24 @@ export default function App() {
             setSortBy={setSortBy}
             suggMap={suggMap}
             suggRank={suggRank}
-            suggAlgo={suggAlgo}
-            setSuggAlgo={(a) => setSuggAlgo(a)}
           />
         );
     }
   };
-
-  const handleLayoutChange = (v: LayoutState) => { setLayout(v); saveLayout(v); };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
         <Ribbon
+          lang={lang} setLang={setLang}
           matrixName={matrixName || ""}
           selected={selected as Record<string, number>}
-          onApplied={handleApplied}
-          lang={lang} setLang={setLang}
           keys={keys} activeKey={activeKey} onPickKey={pickKey} onRefreshKeys={refreshKeys}
           mode={mode} setMode={setMode}
           algo={algo} setAlgo={setAlgo}
           themeMode={themeMode} setThemeMode={setThemeMode}
-          layout={layout} onLayoutChange={handleLayoutChange}
+          layout={layout} onLayoutChange={(v) => { setLayout(v); saveLayout(v); }}
           showMatchSupport={showMatchSupport} setShowMatchSupport={setShowMatchSupport}
           onHelp={() => alert("Help is coming soon…")}
         />
@@ -184,7 +163,7 @@ export default function App() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gridTemplateRows: "1fr 1fr",
-            height: "calc(100vh - 48px)", // Subtract header height
+            height: "calc(100vh - 48px)",
           }}
         >
           <Box sx={{ minHeight: 0, overflow: 'hidden' }}>{renderPanel(layout.tl)}</Box>
