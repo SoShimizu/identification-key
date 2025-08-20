@@ -59,6 +59,7 @@ func (a *App) PickKey(name string) error {
 func (a *App) GetMatrix() (*engine.Matrix, error) {
 	if a.currentMatrix == nil {
 		// まだ何も選んでいない → keys/ を見て最初をロード
+		_ = a.EnsureMyKeysAndSamples() // もし空ならサンプル生成
 		list, err := a.listXLSX()
 		if err != nil {
 			return nil, err
@@ -75,8 +76,8 @@ func (a *App) GetMatrix() (*engine.Matrix, error) {
 
 // ApplyFiltersAlgoOpt:
 //   - selected: 形質ID -> -1/0/1
-//   - mode: "lenient" | "strict" （現状はアルゴ側で必要なら解釈）
-//   - algo: "bayes" | "heuristic"（bayes推奨）
+//   - mode: "lenient" | "strict"
+//   - algo: "bayes" | "heuristic"
 //   - options: 誤検出/見落とし/ハイパパラ/情報利得有無 など
 func (a *App) ApplyFiltersAlgoOpt(
 	selected map[string]int,
@@ -91,7 +92,6 @@ func (a *App) ApplyFiltersAlgoOpt(
 	}
 
 	// app 側オプション → engine 側オプションへ写し替え
-	// ※ engine.AlgoOptions に存在するフィールドのみをセットする
 	eopts := engine.AlgoOptions{
 		DefaultAlphaFP: opts.DefaultAlphaFP,
 		DefaultBetaFN:  opts.DefaultBetaFN,
@@ -102,7 +102,7 @@ func (a *App) ApplyFiltersAlgoOpt(
 		Kappa:          opts.Kappa,
 	}
 
-	// エンジンへ。内部で posterior & suggestions を計算
+	// 新しいエンジンへ処理を委譲
 	res, err := engine.ApplyFiltersAlgoOpt(
 		a.currentMatrix,
 		selected,
@@ -113,6 +113,7 @@ func (a *App) ApplyFiltersAlgoOpt(
 	if err != nil {
 		return nil, err
 	}
+
 	return &ApplyResultEx{
 		Scores:      res.Scores,
 		Suggestions: res.Suggestions,

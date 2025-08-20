@@ -52,7 +52,7 @@ func (a *App) setCurrentKeyByPath(p string) error {
 	a.currentPath = p
 	a.currentKey = filepath.Base(p)
 	// UIへ反映
-	runtime.EventsEmit(a.ctx, "matrix_changed", a.currentKey)
+	runtime.EventsEmit(a.ctx, "matrix_changed")
 	return nil
 }
 

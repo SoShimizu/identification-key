@@ -1,3 +1,4 @@
+// backend/engine/suggest.go
 package engine
 
 import (
@@ -11,13 +12,13 @@ func computeMatchStats(obs map[string]Ternary, tx *Taxon) (matches, support, con
 			continue
 		}
 		support++
-		v := tx.Traits[tid]
-		if v == NA {
+		v, ok := tx.Traits[tid]
+		if !ok || v == NA {
 			continue
 		}
-		if (o == Yes && v == Yes) || (o == No && v == No) {
+		if o == v {
 			matches++
-		} else if (o == Yes && v == No) || (o == No && v == Yes) {
+		} else {
 			conflicts++
 		}
 	}
