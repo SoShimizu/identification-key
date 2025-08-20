@@ -1,0 +1,44 @@
+package engine
+
+import "errors"
+
+// ApplyFiltersAlgoOpt : 選択を反映して候補タクサと「次に効く形質」を返す
+// - m が nil の場合は SetCurrentMatrix で設定済みの行列を使う
+// - algo: "bayes" | "heuristic"
+// - mode: "lenient" | "strict"
+func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, opt AlgoOptions) (*EvalResult, error) {
+	if m == nil {
+		m = currentMatrix
+	}
+	if m == nil {
+		return nil, errors.New("no matrix loaded")
+	}
+
+	var (
+		post []float64
+		rows []TaxonScore
+		err  error
+	)
+
+	switch algo {
+	case "heuristic":
+		post, rows, err = evaluateHeuristic(m, selected)
+	default: // "bayes"
+		post, rows, err = evaluateBayes(m, selected, opt, mode)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var sugg []TraitSuggestion
+	if opt.WantInfoGain {
+		// 期待候補削減率は 1% を既定の閾値とする
+		tau := 0.01
+		sugg = SuggestTraitsBayes(m, post, tau, selected)
+	}
+
+	return &EvalResult{
+		Scores:      rows,
+		Suggestions: sugg,
+	}, nil
+}
