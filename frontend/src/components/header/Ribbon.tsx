@@ -6,11 +6,11 @@ import {
 import TuneIcon from "@mui/icons-material/Tune";
 import ScienceIcon from '@mui/icons-material/Science';
 import TranslateIcon from '@mui/icons-material/Translate';
-import HomeIcon from '@mui/icons-material/Home'; 
+import HomeIcon from '@mui/icons-material/Home';
 
 import RibbonWelcomeTab from "./RibbonWelcomeTab";
 import RibbonCandidatesTab from "./RibbonCandidatesTab";
-import RibbonTraitsTab from "./RibbonTraitsTab"; 
+import RibbonTraitsTab from "./RibbonTraitsTab";
 import { STR } from "../../i18n";
 import { AlgoOptions } from "../../hooks/useAlgoOpts";
 import { BrowserOpenURL } from "../../../wailsjs/runtime";
@@ -46,12 +46,12 @@ export default function Ribbon(props: RibbonProps) {
   } = props;
 
   const T = STR[lang];
-  
+
   const [tab, setTab] = useState<TabKey | false>(false);
 
   return (
     <AppBar
-        position="relative" 
+        position="relative"
         color="default"
         elevation={0}
         sx={{
@@ -90,15 +90,15 @@ export default function Ribbon(props: RibbonProps) {
         </Tooltip>
       </Toolbar>
 
-      <Collapse in={tab !== false} timeout="auto">
-        <Box 
+      <Collapse in={tab !== false} timeout={300}>
+        <Box
             onMouseEnter={() => setTab(tab)} onMouseLeave={() => setTab(false)}
-            sx={{ 
+            sx={{
                 position: 'absolute',
                 left: 0,
                 right: 0,
-                px: 2, 
-                py: 2, 
+                px: 2,
+                py: 2,
                 bgcolor: 'background.default',
                 boxShadow: '0px 4px 12px -2px rgba(0,0,0,0.1)',
                 borderBottom: 1,

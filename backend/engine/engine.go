@@ -22,6 +22,8 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 
 	switch algo {
 	case "heuristic":
+		// Note: Heuristic mode doesn't currently support categorical_multi traits.
+		// It could be extended to do so if needed.
 		scores, err = evaluateHeuristic(m, selected, mode)
 		if err == nil {
 			post = make([]float64, len(m.Taxa))
@@ -37,6 +39,7 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 
 	default: // "bayes"
 		var ranked []BayesRanked
+		// Pass the new options to the bayesian evaluator
 		ranked, scores, err = evaluateBayes(m, selected, opt, mode)
 		if err == nil {
 			post = make([]float64, len(m.Taxa))
@@ -69,7 +72,7 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 	var sugg []TraitSuggestion
 	if opt.WantInfoGain && post != nil {
 		tau := 0.01
-		sugg = SuggestTraitsBayes(m, post, tau, selected, opt) // ✨ optを渡す
+		sugg = SuggestTraitsBayes(m, post, tau, selected, opt) // Pass opt here
 	}
 
 	return &EvalResult{

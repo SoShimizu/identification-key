@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Box, Tab, Tabs, ButtonGroup, Button, Stack, FormControlLabel, Switch, Typography, Divider } from '@mui/material';
 import TraitsPanel, { TraitRow } from './TraitsPanel';
 import HelpDisplay from './HelpDisplay';
-import { Trait, TraitSuggestion } from '../../../api';
+import { Trait, TraitSuggestion, MultiChoice } from '../../../api'; // Import MultiChoice
 import { AlgoOptions } from '../../../hooks/useAlgoOpts';
 import { STR } from '../../../i18n';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -12,8 +12,10 @@ type Props = {
     lang: "ja" | "en";
     rows: TraitRow[];
     selected: Record<string, number>;
+    selectedMulti: Record<string, MultiChoice>; // Add this line
     setBinary: (traitId: string, val: number, label: string) => void;
     setContinuous: (traitId: string, val: number | null, label: string) => void;
+    setMulti: (traitId: string, values: MultiChoice, label: string) => void; // Add this line
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
     clearAllSelections: () => void;
@@ -35,7 +37,8 @@ export default function TraitsTabsPanel(props: Props) {
         setActiveTrait(trait);
     };
 
-    const hasSelections = Object.keys(selected).length > 0;
+    const hasSelections = Object.keys(selected).length > 0 || Object.values(props.selectedMulti).some(v => v.length > 0);
+
 
     return (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -51,9 +54,9 @@ export default function TraitsTabsPanel(props: Props) {
                         <Button onClick={() => setSortBy("name")} variant={sortBy === "name" ? "contained" : "outlined"}>{T.sort_name}</Button>
                     </ButtonGroup>
                     <Divider orientation="vertical" flexItem />
-                    <Button 
-                        size="small" 
-                        variant="outlined" 
+                    <Button
+                        size="small"
+                        variant="outlined"
                         color="warning"
                         startIcon={<ReplayIcon />}
                         onClick={clearAllSelections}
@@ -63,7 +66,7 @@ export default function TraitsTabsPanel(props: Props) {
                     </Button>
                 </Stack>
             </Stack>
-            
+
             <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, p: 2, gap: 2, minHeight: 0 }}>
                 <Box sx={{ flex: { md: 8 }, height: '100%', minHeight: 0 }}>
                     <Box sx={{ display: activeTab === 'unselected' ? 'block' : 'none', height: '100%' }}>

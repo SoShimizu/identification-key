@@ -102,9 +102,11 @@ func (a *App) ApplyFiltersAlgoOpt(
 		}
 	}
 
+	// Fully map all options from the frontend to the engine's options struct
 	eopts := engine.AlgoOptions{
 		DefaultAlphaFP:    opts.DefaultAlphaFP,
 		DefaultBetaFN:     opts.DefaultBetaFN,
+		GammaNAPenalty:    opts.GammaNAPenalty,
 		WantInfoGain:      opts.WantInfoGain,
 		UsePragmaticScore: opts.UsePragmaticScore,
 		Lambda:            opts.Lambda,
@@ -112,6 +114,9 @@ func (a *App) ApplyFiltersAlgoOpt(
 		B0:                opts.B0,
 		Kappa:             opts.Kappa,
 		ConflictPenalty:   opts.ConflictPenalty,
+		ToleranceFactor:   opts.ToleranceFactor,
+		CategoricalAlgo:   opts.CategoricalAlgo,
+		JaccardThreshold:  opts.JaccardThreshold,
 	}
 
 	res, err := engine.ApplyFiltersAlgoOpt(

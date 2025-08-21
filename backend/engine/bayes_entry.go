@@ -15,6 +15,8 @@ func EvaluateBayesA2FromOptions(
 ) ([]BayesRanked, error) {
 
 	// ---- パラメータ解決 ----
+	// Use values directly from the passed 'opt' struct.
+	// Default fallbacks can be handled here if a value is zero, but the frontend should provide sane defaults.
 	alpha := opt.DefaultAlphaFP
 	if alpha <= 0 {
 		alpha = 0.03
@@ -27,15 +29,22 @@ func EvaluateBayesA2FromOptions(
 	if kappa < 0 {
 		kappa = 1.0
 	}
+	gamma := opt.GammaNAPenalty
+	if gamma <= 0 || gamma > 1.0 {
+		gamma = 0.95 // Fallback if an invalid value is passed
+	}
 
-	// フロントエンドから渡された値を直接使用
+	// Pass all relevant parameters to the core evaluation function.
 	params := BayesEvalParams{
-		AlphaFP:         alpha,
-		BetaFN:          beta,
-		GammaNAPenalty:  0.95,
-		Kappa:           kappa,
-		EpsilonCut:      1e-6,
-		ConflictPenalty: opt.ConflictPenalty, // Use the new adjustable penalty
+		AlphaFP:          alpha,
+		BetaFN:           beta,
+		GammaNAPenalty:   gamma, // Use the value from frontend options
+		Kappa:            kappa,
+		EpsilonCut:       1e-6,
+		ConflictPenalty:  opt.ConflictPenalty,
+		ToleranceFactor:  opt.ToleranceFactor,
+		CategoricalAlgo:  opt.CategoricalAlgo,
+		JaccardThreshold: opt.JaccardThreshold,
 	}
 
 	// ---- Bayes 本体の評価 ----

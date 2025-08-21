@@ -1,9 +1,11 @@
 // frontend/src/components/header/RibbonTraitsTab.tsx
 import React, { useMemo } from "react";
 import {
-  Box, FormControlLabel, Slider, Stack, Switch, Tooltip, Typography
+  Box, FormControlLabel, Slider, Stack, Switch, Typography, RadioGroup, Radio, FormControl, Card, CardContent, CardHeader, Divider, Table, TableBody, TableCell, TableRow, TableHead
 } from "@mui/material";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import RecommendIcon from '@mui/icons-material/Recommend';
+import StraightenIcon from '@mui/icons-material/Straighten';
+import HubIcon from '@mui/icons-material/Hub';
 import { AlgoOptions, clampAlgoOptions } from "../../hooks/useAlgoOpts";
 import { STR } from "../../i18n";
 
@@ -13,35 +15,6 @@ type Props = {
   lang: "ja" | "en";
 };
 
-// A helper component for a labeled slider
-const LabeledSlider = ({ label, tooltip, value, min, max, step, onChange, valueFormat }: {
-    label: string; tooltip: string; value: number; min: number; max: number; step: number;
-    onChange: (event: Event, value: number | number[]) => void;
-    valueFormat?: (v: number) => string;
-}) => (
-    <Box>
-        <Stack spacing={1}>
-            <Box sx={{ display:"flex", alignItems:"center", gap:0.5 }}>
-                <Typography variant="body2">{label}</Typography>
-                <Tooltip title={tooltip}><InfoOutlinedIcon fontSize="small" /></Tooltip>
-            </Box>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-                <Typography variant="caption" sx={{ minWidth: 35, textAlign: 'right' }}>{valueFormat ? valueFormat(min) : min}</Typography>
-                <Slider 
-                    min={min} 
-                    max={max} 
-                    step={step} 
-                    value={value} 
-                    onChange={onChange}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={valueFormat}
-                />
-                <Typography variant="caption" sx={{ minWidth: 35 }}>{valueFormat ? valueFormat(max) : max}</Typography>
-            </Stack>
-        </Stack>
-    </Box>
-);
-
 export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
   const T = STR[lang].traitsTab;
   const saneOpts = useMemo(() => clampAlgoOptions(opts), [opts]);
@@ -50,25 +23,147 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
       setOpts(prev => ({ ...prev, [key]: checked }));
   };
 
+  const handleRadio = (key: keyof AlgoOptions) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setOpts(prev => ({ ...prev, [key]: event.target.value }));
+  };
+
   return (
-    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "start" }}>
-        <Box>
-            <FormControlLabel 
-                control={<Switch checked={opts.usePragmaticScore} onChange={handleBool("usePragmaticScore")} />} 
-                label={<Typography variant="body2">{T.pragmatic_score}</Typography>}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{display: 'block'}}>
-                {T.pragmatic_score_tooltip}
-            </Typography>
-        </Box>
-        <LabeledSlider
-            label={T.param_tolerance}
-            tooltip={T.tooltip_tolerance}
-            value={saneOpts.toleranceFactor}
-            min={0} max={0.5} step={0.01}
-            onChange={(_, v) => setOpts((prev: AlgoOptions) => ({ ...prev, toleranceFactor: v as number }))}
-            valueFormat={v => `${(v*100).toFixed(0)}%`}
-        />
-    </Box>
+    <Stack direction={{xs: "column", md: "row"}} spacing={2} alignItems="flex-start">
+        <Card variant="outlined" sx={{ flex: 1, width: '100%' }}>
+            <CardHeader avatar={<RecommendIcon color="action" />} title={T.param_recommend.title} titleTypographyProps={{variant: 'h6'}} />
+            <CardContent>
+                <FormControlLabel
+                    control={<Switch checked={opts.usePragmaticScore} onChange={handleBool("usePragmaticScore")} />}
+                    label={<Typography variant="subtitle2">{T.pragmatic_score.name}</Typography>}
+                />
+                <Box sx={{ p: 1, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
+                        {T.pragmatic_score.description}{'\n\n'}
+                        <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.pragmatic_score.effect}
+                    </Typography>
+                     <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' }}}>
+                         <TableHead>
+                            <TableRow>
+                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_setting}</Typography></TableCell>
+                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_merit}</Typography></TableCell>
+                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_demerit}</Typography></TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {T.pragmatic_score.tradeoffs.map(item => (
+                                <TableRow key={item.setting}>
+                                    <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
+                                    <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </Box>
+            </CardContent>
+        </Card>
+
+        <Card variant="outlined" sx={{ flex: 1, width: '100%' }}>
+            <CardHeader avatar={<StraightenIcon color="action" />} title={T.param_continuous.title} titleTypographyProps={{variant: 'h6'}}/>
+            <CardContent>
+                 <Typography variant="subtitle2">{T.param_tolerance.name}</Typography>
+                 <Box sx={{px: 1}}>
+                    <Slider
+                        value={saneOpts.toleranceFactor}
+                        onChange={(_, v) => setOpts(p => ({ ...p, toleranceFactor: v as number }))}
+                        min={0} max={0.5} step={0.01}
+                        valueLabelDisplay="auto"
+                        valueLabelFormat={v => `${(v*100).toFixed(0)}%`}
+                    />
+                    <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="caption">0% (Strict)</Typography>
+                        <Typography variant="caption">50% (Lenient)</Typography>
+                    </Stack>
+                 </Box>
+                 <Box sx={{ p: 1, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
+                        {T.param_tolerance.description}{'\n\n'}
+                        <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.param_tolerance.effect}
+                    </Typography>
+                    <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' }}}>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_setting}</Typography></TableCell>
+                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_merit}</Typography></TableCell>
+                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_demerit}</Typography></TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {T.param_tolerance.tradeoffs.map(item => (
+                                <TableRow key={item.setting}>
+                                    <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
+                                    <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                 </Box>
+            </CardContent>
+        </Card>
+
+        <Card variant="outlined" sx={{ flex: 1.5, width: '100%' }}>
+            <CardHeader avatar={<HubIcon color="action" />} title={T.param_multi.title} titleTypographyProps={{variant: 'h6'}}/>
+            <CardContent>
+                <FormControl>
+                    <Typography variant="subtitle2" gutterBottom>{T.categorical_algo.name}</Typography>
+                    <RadioGroup row value={opts.categoricalAlgo} onChange={handleRadio("categoricalAlgo")}>
+                        <FormControlLabel value="jaccard" control={<Radio size="small" />} label="Jaccard" />
+                        <FormControlLabel value="binary" control={<Radio size="small" />} label="Binary" />
+                    </RadioGroup>
+                     <Box sx={{ p: 1, my: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                            {opts.categoricalAlgo === 'jaccard' ? T.categorical_algo.desc_jaccard : T.categorical_algo.desc_binary}
+                        </Typography>
+                     </Box>
+                </FormControl>
+                <Divider sx={{ my: 1.5 }} />
+                <Box sx={{opacity: opts.categoricalAlgo === 'jaccard' ? 1 : 0.5}}>
+                    <Typography variant="subtitle2">{T.jaccard_threshold.name}</Typography>
+                     <Box sx={{px: 1}}>
+                        <Slider
+                            disabled={opts.categoricalAlgo !== 'jaccard'}
+                            value={saneOpts.jaccardThreshold}
+                            onChange={(_, v) => setOpts(p => ({ ...p, jaccardThreshold: v as number }))}
+                            min={0} max={1} step={0.05} valueLabelDisplay="auto"
+                        />
+                        <Stack direction="row" justifyContent="space-between">
+                            <Typography variant="caption">0.0 (Lenient)</Typography>
+                            <Typography variant="caption">1.0 (Strict)</Typography>
+                        </Stack>
+                    </Box>
+                    <Box sx={{ p: 1, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
+                            {T.jaccard_threshold.description}{'\n\n'}
+                            <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.jaccard_threshold.effect}
+                        </Typography>
+                         <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' }}}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_setting}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_merit}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_demerit}</Typography></TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {T.jaccard_threshold.tradeoffs.map(item => (
+                                    <TableRow key={item.setting}>
+                                        <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
+                                        <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
+                                        <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Box>
+                </Box>
+            </CardContent>
+        </Card>
+    </Stack>
   );
 }

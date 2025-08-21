@@ -19,7 +19,7 @@ type Trait struct {
 	ID         string   `json:"id"`
 	Name       string   `json:"name"`
 	Group      string   `json:"group"`
-	Type       string   `json:"type"` // "binary", "derived", "nominal_parent", "continuous"
+	Type       string   `json:"type"` // "binary", "derived", "nominal_parent", "continuous", "categorical_multi"
 	Parent     string   `json:"parent,omitempty"`
 	State      string   `json:"state,omitempty"`
 	Difficulty float64  `json:"difficulty,omitempty"`
@@ -30,13 +30,16 @@ type Trait struct {
 	MinValue  float64 `json:"minValue,omitempty"`
 	MaxValue  float64 `json:"maxValue,omitempty"`
 	IsInteger bool    `json:"isInteger,omitempty"` // True if the trait only takes integer values
+	// For categorical_multi traits
+	States []string `json:"states,omitempty"`
 }
 
 type Taxon struct {
-	ID               string                     `json:"id"`
-	Name             string                     `json:"name"`
-	Traits           map[string]Ternary         `json:"traits"`
-	ContinuousTraits map[string]ContinuousValue `json:"continuousTraits"`
+	ID                string                     `json:"id"`
+	Name              string                     `json:"name"`
+	Traits            map[string]Ternary         `json:"traits"`
+	ContinuousTraits  map[string]ContinuousValue `json:"continuousTraits"`
+	CategoricalTraits map[string][]string        `json:"categoricalTraits"`
 }
 
 type Matrix struct {
@@ -45,7 +48,6 @@ type Matrix struct {
 	Taxa   []Taxon `json:"taxa"`
 }
 
-// ... (以降の型定義は変更なし)
 type TaxonScore struct {
 	Index     int     `json:"index"`
 	Taxon     Taxon   `json:"taxon"`
@@ -76,6 +78,7 @@ type TraitSuggestion struct {
 type AlgoOptions struct {
 	DefaultAlphaFP    float64 `json:"defaultAlphaFP"`
 	DefaultBetaFN     float64 `json:"defaultBetaFN"`
+	GammaNAPenalty    float64 `json:"gammaNAPenalty"` // Add this missing field
 	WantInfoGain      bool    `json:"wantInfoGain"`
 	UsePragmaticScore bool    `json:"usePragmaticScore"`
 	Lambda            float64 `json:"lambda"`
@@ -83,8 +86,9 @@ type AlgoOptions struct {
 	B0                float64 `json:"b0"`
 	Kappa             float64 `json:"kappa"`
 	ConflictPenalty   float64 `json:"conflictPenalty"`
-	// New field for continuous trait tolerance
-	ToleranceFactor float64 `json:"toleranceFactor"`
+	ToleranceFactor   float64 `json:"toleranceFactor"`
+	CategoricalAlgo   string  `json:"categoricalAlgo"`  // Add this missing field
+	JaccardThreshold  float64 `json:"jaccardThreshold"` // Add this missing field
 }
 type EvalResult struct {
 	Scores      []TaxonScore      `json:"scores"`

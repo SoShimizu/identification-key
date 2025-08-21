@@ -24,9 +24,19 @@ type LoadSummary struct {
 
 var reFullWidthDigit = regexp.MustCompile(`[０-９－]+`)
 
+// A replacer to clean up various whitespace characters, including non-breaking spaces.
+var whitespaceReplacer = strings.NewReplacer("\u00A0", " ", "\t", " ", "　", " ") // Added full-width space
+
+// cleanString is a new helper function to standardize string cleaning.
+func cleanString(s string) string {
+	s = toHalfWidthNums(s)
+	s = whitespaceReplacer.Replace(s)
+	return strings.TrimSpace(s)
+}
+
 // parseRange parses a string like "5.0" or "1.4-1.5" into a ContinuousValue.
 func parseRange(s string) (ContinuousValue, bool) {
-	s = strings.TrimSpace(toHalfWidthNums(s))
+	s = cleanString(s)
 	s = strings.ReplaceAll(s, ",", "")
 
 	if s == "" {
@@ -65,10 +75,10 @@ func toHalfWidthNums(s string) string {
 }
 
 func parseTernaryCell(s string) Ternary {
+	s = cleanString(s)
 	if s == "" {
 		return NA
 	}
-	s = strings.TrimSpace(toHalfWidthNums(s))
 	ls := strings.ToLower(s)
 	switch ls {
 	case "-1", "n", "no", "false", "いいえ", "無し", "なし", "absent":
@@ -83,7 +93,7 @@ func parseTernaryCell(s string) Ternary {
 }
 
 func parseDifficulty(s string) float64 {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.ToLower(cleanString(s))
 	switch s {
 	case "easy":
 		return 0.5
@@ -102,7 +112,7 @@ func parseDifficulty(s string) float64 {
 }
 
 func parseRisk(s string) float64 {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.ToLower(cleanString(s))
 	switch s {
 	case "lowest":
 		return 0.0
@@ -132,7 +142,8 @@ func getCell(rows [][]string, r, c int) string {
 	if c >= len(rows[r]) {
 		return ""
 	}
-	return strings.TrimSpace(rows[r][c])
+	// Use the new cleaning function for all cell retrievals
+	return cleanString(rows[r][c])
 }
 
 type traitKind int
@@ -142,6 +153,7 @@ const (
 	kindNominal
 	kindOrdinal
 	kindContinuous
+	kindCategoricalMulti // New kind
 )
 
 type typeSpec struct {
@@ -150,7 +162,7 @@ type typeSpec struct {
 }
 
 func parseStateList(s string) []string {
-	s = strings.TrimSpace(s)
+	s = cleanString(s)
 	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
 		s = strings.TrimSpace(s[1 : len(s)-1])
 	}
@@ -167,7 +179,7 @@ func parseStateList(s string) []string {
 }
 
 func parseStateListOrdered(s string) []string {
-	s = strings.TrimSpace(s)
+	s = cleanString(s)
 	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
 		s = strings.TrimSpace(s[1 : len(s)-1])
 	}
@@ -184,7 +196,7 @@ func parseStateListOrdered(s string) []string {
 }
 
 func parseTypeSpec(s string) typeSpec {
-	x := strings.ToLower(strings.TrimSpace(s))
+	x := strings.ToLower(cleanString(s))
 	if x == "" || x == "binary" {
 		return typeSpec{kind: kindBinary}
 	}
@@ -198,6 +210,9 @@ func parseTypeSpec(s string) typeSpec {
 	}
 	if strings.HasPrefix(x, "continuous") {
 		return typeSpec{kind: kindContinuous}
+	}
+	if strings.HasPrefix(x, "categorical_multi") { // New type handling
+		return typeSpec{kind: kindCategoricalMulti}
 	}
 	return typeSpec{kind: kindBinary}
 }
@@ -229,7 +244,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	taxonCols := []int{}
 
 	for i, h := range header {
-		cleanHeader := strings.ToLower(strings.TrimSpace(h))
+		cleanHeader := strings.ToLower(cleanString(h))
 		if strings.HasPrefix(cleanHeader, "#") {
 			switch cleanHeader {
 			case "#group":
@@ -250,7 +265,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				colIdxHelpImage = i
 			}
 		} else if cleanHeader != "" {
-			taxonNames = append(taxonNames, strings.TrimSpace(h))
+			taxonNames = append(taxonNames, cleanString(h))
 			taxonCols = append(taxonCols, i)
 		}
 	}
@@ -268,10 +283,11 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	taxonIndex := map[string]int{}
 	for i, nm := range taxonNames {
 		m.Taxa = append(m.Taxa, Taxon{
-			ID:               nm,
-			Name:             nm,
-			Traits:           make(map[string]Ternary),
-			ContinuousTraits: make(map[string]ContinuousValue),
+			ID:                nm,
+			Name:              nm,
+			Traits:            make(map[string]Ternary),
+			ContinuousTraits:  make(map[string]ContinuousValue),
+			CategoricalTraits: make(map[string][]string), // Initialize new map
 		})
 		taxonIndex[nm] = i
 	}
@@ -426,6 +442,47 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					IsInteger:  isInteger,
 				})
 			}
+		case kindCategoricalMulti:
+			traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			allStates := make(map[string]struct{})
+			for i, col := range taxonCols {
+				valStr := getCell(rows, r, col)
+				if valStr == "" {
+					continue
+				}
+				// Split by semicolon
+				parts := strings.Split(valStr, ";")
+				var values []string
+				for _, p := range parts {
+					trimmed := cleanString(p)
+					if trimmed != "" {
+						values = append(values, trimmed)
+						allStates[trimmed] = struct{}{}
+					}
+				}
+				if len(values) > 0 {
+					idx := taxonIndex[taxonNames[i]]
+					m.Taxa[idx].CategoricalTraits[traitID] = values
+				}
+			}
+			// Collect all unique states for this trait
+			var states []string
+			for state := range allStates {
+				states = append(states, state)
+			}
+			sort.Strings(states)
+
+			m.Traits = append(m.Traits, Trait{
+				ID:         traitID,
+				Name:       traitName,
+				Group:      group,
+				Type:       "categorical_multi",
+				Difficulty: difficultyVal,
+				Risk:       riskVal,
+				HelpText:   helpText,
+				HelpImages: helpImages,
+				States:     states, // Store all possible states for the UI
+			})
 		}
 	}
 

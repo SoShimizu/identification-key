@@ -10,29 +10,17 @@ import (
 func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode string) ([]BayesRanked, []TaxonScore, error) {
 	nTaxa := len(m.Taxa)
 
-	// Create a map of selected trait IDs to their observed values for efficient lookup.
-	// This includes both binary and continuous traits.
-	activeSelections := make(map[string]float64)
-	for id, val := range selected {
-		// For binary traits, 0 means unselected. For continuous, any value is a selection.
-		// The value itself is stored as a float64.
-		if val != 0 {
-			activeSelections[id] = float64(val)
-		}
-	}
-	// Also consider continuous values that might be 0 but are still selected.
-	// The `selected` map now handles both, so we just filter out the unselected binary traits (value 0).
-	// Let's refine the logic to handle continuous traits whose value could be 0.
-	// A better approach is to check the trait type. Let's create a trait map first.
 	traitMap := make(map[string]Trait)
 	for _, t := range m.Traits {
 		traitMap[t.ID] = t
 	}
 
 	activeTraitIDs := make([]string, 0, len(selected))
-	for id := range selected {
+	for id, val := range selected {
 		if _, ok := traitMap[id]; ok {
-			activeTraitIDs = append(activeTraitIDs, id)
+			if val != 0 {
+				activeTraitIDs = append(activeTraitIDs, id)
+			}
 		}
 	}
 
@@ -47,25 +35,30 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 			return BayesTruth{Unknown: true}, false
 		}
 
-		if trait.Type == "continuous" {
+		switch trait.Type {
+		case "continuous":
 			if val, ok := taxon.ContinuousTraits[traitID]; ok {
 				return BayesTruth{Kind: BayesTraitContinuous, Min: val.Min, Max: val.Max}, true
 			}
 			return BayesTruth{Kind: BayesTraitContinuous, Unknown: true}, true
+		case "categorical_multi":
+			if values, ok := taxon.CategoricalTraits[traitID]; ok && len(values) > 0 {
+				return BayesTruth{Kind: BayesTraitCategoricalMulti, StatesMulti: values}, true
+			}
+			return BayesTruth{Kind: BayesTraitCategoricalMulti, Unknown: true}, true
+		default: // binary/derived
+			val, ok := taxon.Traits[traitID]
+			if !ok || val == NA {
+				return BayesTruth{Kind: BayesTraitBinary, K: 2, Unknown: true}, true
+			}
+			return BayesTruth{Kind: BayesTraitBinary, K: 2, States: []int{int(val)}}, true
 		}
-
-		// Default to binary/derived
-		val, ok := taxon.Traits[traitID]
-		if !ok || val == NA {
-			return BayesTruth{Kind: BayesTraitBinary, K: 2, Unknown: true}, true
-		}
-		return BayesTruth{Kind: BayesTraitBinary, K: 2, States: []int{int(val)}}, true
 	}
 
 	// getObs provides the user's observation for a given trait.
 	getObs := func(traitID string) (BayesObservation, bool) {
 		val, ok := selected[traitID]
-		if !ok {
+		if !ok || val == 0 {
 			return BayesObservation{IsNA: true}, false
 		}
 
@@ -74,27 +67,36 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 			return BayesObservation{IsNA: true}, false
 		}
 
-		if trait.Type == "continuous" {
-			// For continuous, the value is stored directly. A value of 0 is a valid observation.
+		switch trait.Type {
+		case "continuous":
 			return BayesObservation{Kind: BayesTraitContinuous, Value: float64(val)}, true
-		}
-
-		// For binary, a value of 0 means "unselected" or NA.
-		if val == 0 {
+		case "categorical_multi":
+			var selectedStates []string
+			for i, state := range trait.States {
+				if (val>>i)&1 == 1 {
+					selectedStates = append(selectedStates, state)
+				}
+			}
+			if len(selectedStates) > 0 {
+				return BayesObservation{Kind: BayesTraitCategoricalMulti, StatesMulti: selectedStates}, true
+			}
 			return BayesObservation{IsNA: true}, false
+		default: // binary
+			return BayesObservation{Kind: BayesTraitBinary, K: 2, State: val}, true
 		}
-		return BayesObservation{Kind: BayesTraitBinary, K: 2, State: val}, true
 	}
 
-	// Prepare parameters for the Bayesian evaluation
+	// Prepare parameters for the Bayesian evaluation, ensuring all opts are passed correctly.
 	evalParams := BayesEvalParams{
-		AlphaFP:         opt.DefaultAlphaFP,
-		BetaFN:          opt.DefaultBetaFN,
-		GammaNAPenalty:  0.95, // This could be made configurable later
-		Kappa:           opt.Kappa,
-		EpsilonCut:      1e-6, // This could be made configurable later
-		ConflictPenalty: opt.ConflictPenalty,
-		ToleranceFactor: opt.ToleranceFactor,
+		AlphaFP:          opt.DefaultAlphaFP,
+		BetaFN:           opt.DefaultBetaFN,
+		GammaNAPenalty:   opt.GammaNAPenalty, // CRITICAL FIX: Use the value from opt, not a hardcoded one.
+		Kappa:            opt.Kappa,
+		EpsilonCut:       1e-6,
+		ConflictPenalty:  opt.ConflictPenalty,
+		ToleranceFactor:  opt.ToleranceFactor,
+		CategoricalAlgo:  opt.CategoricalAlgo,
+		JaccardThreshold: opt.JaccardThreshold,
 	}
 
 	// Call the generic Bayes evaluator
@@ -106,35 +108,13 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 	ranked := RankPosterior(post)
 
 	// Convert ranked posteriors to TaxonScore slice for the UI
-	selectedTernary := make(map[string]Ternary)
-	for k, v := range selected {
-		if trait, ok := traitMap[k]; ok && trait.Type != "continuous" {
-			selectedTernary[k] = Ternary(v)
-		}
-	}
-
 	scores := make([]TaxonScore, len(ranked))
 	for i, r := range ranked {
 		taxon := Taxon{}
 		if r.Index >= 0 && r.Index < len(m.Taxa) {
 			taxon = m.Taxa[r.Index]
 		}
-		matches, support, conflicts := computeMatchStats(selectedTernary, &taxon)
-
-		// Add conflicts from continuous traits
-		for traitId, obsValue := range selected {
-			if trait, ok := traitMap[traitId]; ok && trait.Type == "continuous" {
-				if truth, ok := taxon.ContinuousTraits[traitId]; ok {
-					support++
-					// A simple conflict check for continuous traits
-					if float64(obsValue) < truth.Min || float64(obsValue) > truth.Max {
-						conflicts++
-					} else {
-						matches++
-					}
-				}
-			}
-		}
+		matches, support, conflicts := computeMatchStatsGeneric(m, &taxon, selected, traitMap, opt)
 
 		scores[i] = TaxonScore{
 			Index:     r.Index,
@@ -156,4 +136,70 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 	})
 
 	return ranked, scores, nil
+}
+
+// computeMatchStatsGeneric computes match/support/conflict stats for all trait types.
+func computeMatchStatsGeneric(m *Matrix, taxon *Taxon, selected map[string]int, traitMap map[string]Trait, opt AlgoOptions) (matches, support, conflicts int) {
+	for traitID, obsValue := range selected {
+		if obsValue == 0 {
+			continue
+		}
+		trait, ok := traitMap[traitID]
+		if !ok {
+			continue
+		}
+
+		support++
+		isMatch := false
+
+		switch trait.Type {
+		case "binary", "derived":
+			truthValue, ok := taxon.Traits[traitID]
+			if !ok || truthValue == NA {
+				continue
+			}
+			if int(truthValue) == obsValue {
+				isMatch = true
+			}
+		case "continuous":
+			truth, ok := taxon.ContinuousTraits[traitID]
+			if !ok {
+				continue
+			}
+			if float64(obsValue) >= truth.Min && float64(obsValue) <= truth.Max {
+				isMatch = true
+			}
+		case "categorical_multi":
+			truthStates, ok := taxon.CategoricalTraits[traitID]
+			if !ok || len(truthStates) == 0 {
+				continue
+			}
+			var selectedStates []string
+			for i, state := range trait.States {
+				if (obsValue>>i)&1 == 1 {
+					selectedStates = append(selectedStates, state)
+				}
+			}
+			if len(selectedStates) == 0 {
+				continue
+			}
+
+			if opt.CategoricalAlgo == "jaccard" {
+				if jaccardSimilarity(selectedStates, truthStates) >= opt.JaccardThreshold {
+					isMatch = true
+				}
+			} else { // "binary"
+				if hasIntersection(selectedStates, truthStates) {
+					isMatch = true
+				}
+			}
+		}
+
+		if isMatch {
+			matches++
+		} else {
+			conflicts++
+		}
+	}
+	return
 }

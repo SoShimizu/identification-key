@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Dispatch, SetStateAction } from "react";
 import { EnsureMyKeysAndSamples, ListMyKeys, GetCurrentKeyName, PickKey } from "../../wailsjs/go/main/App";
 import { applyFilters } from "../utils/applyFilters";
-import { Matrix, TaxonScore, Trait, TraitSuggestion, Choice } from "../api";
+import { Matrix, TaxonScore, Trait, TraitSuggestion, Choice, MultiChoice } from "../api";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { useAlgoOpts, AlgoOptions } from "./useAlgoOpts";
 import { TraitRow } from "../components/panels/traits/TraitsPanel";
@@ -23,8 +23,10 @@ type UseMatrixReturn = {
     matrixName: string;
     taxaCount: number;
     selected: Record<string, Choice>;
+    selectedMulti: Record<string, MultiChoice>; // New state for multi-choice traits
     setBinary: (traitId: string, val: Choice, label?: string) => void;
-    setContinuous: (traitId: string, val: number | null, label?: string) => void; 
+    setContinuous: (traitId: string, val: number | null, label?: string) => void;
+    setMulti: (traitId: string, values: MultiChoice, label?: string) => void; // New setter for multi-choice
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel?: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
     clearAllSelections: () => void;
@@ -61,13 +63,14 @@ export function useMatrix(): UseMatrixReturn {
 
   // selection
   const [selected, setSelected] = useState<Record<string, Choice>>({});
+  const [selectedMulti, setSelectedMulti] = useState<Record<string, MultiChoice>>({}); // New state
 
   // mode/algo from UI settings
   const { opts, setOpts } = useAlgoOpts(matrixName);
   const [algo, setAlgo] = useState<"bayes" | "heuristic">("bayes");
-  
+
   const mode = useMemo(() => (opts.conflictPenalty > 0.5 ? "strict" : "lenient"), [opts.conflictPenalty]);
-  
+
   const setMode = useCallback((newMode: "strict" | "lenient") => {
       setOpts(prevOpts => ({
           ...prevOpts,
@@ -106,6 +109,7 @@ export function useMatrix(): UseMatrixReturn {
         setActiveKey(name);
         await PickKey(name);
         setSelected({});
+        setSelectedMulti({}); // Reset multi-selection as well
         setHistory([]);
     } catch (error) {
         console.error(`Failed to pick key "${name}":`, error);
@@ -137,13 +141,31 @@ export function useMatrix(): UseMatrixReturn {
   // === Evaluation (debounced) ===
   const runEval = useCallback(async () => {
     try {
-        const res = await applyFilters(selected, mode, algo, { ...opts, wantInfoGain: true });
+        // Convert multi-selections to a bitmask for the backend
+        const combinedSelected = { ...selected };
+        for (const traitId in selectedMulti) {
+            const trait = traits.find(t => t.id === traitId);
+            if (trait && trait.states) {
+                let bitmask = 0;
+                for (let i = 0; i < trait.states.length; i++) {
+                    if (selectedMulti[traitId].includes(trait.states[i])) {
+                        bitmask |= (1 << i);
+                    }
+                }
+                if (bitmask > 0) {
+                    combinedSelected[traitId] = bitmask;
+                }
+            }
+        }
+
+        const res = await applyFilters(combinedSelected, mode, algo, { ...opts, wantInfoGain: true });
         setScores(res.scores || []);
         setSuggs(res.suggestions || []);
     } catch (error) {
         console.error("Failed to run evaluation:", error);
     }
-  }, [selected, mode, algo, opts]);
+  }, [selected, selectedMulti, traits, mode, algo, opts]);
+
 
   const runEvalDebounced = useDebouncedCallback(runEval, 120);
   useEffect(() => { runEvalDebounced(); }, [runEvalDebounced]);
@@ -176,6 +198,20 @@ export function useMatrix(): UseMatrixReturn {
     });
   }, []);
 
+  // New setter for multi-categorical traits
+  const setMulti = useCallback((traitId: string, values: MultiChoice, label?: string) => {
+    setSelectedMulti(prev => {
+        const next = {...prev};
+        if(values.length === 0) {
+            delete next[traitId];
+        } else {
+            next[traitId] = values;
+        }
+        setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => [${values.join(', ')}]` }, ...h].slice(0, 200));
+        return next;
+    })
+  }, []);
+
   const setDerivedPick = useCallback((childrenIds: string[], chosenId: string, parentLabel?: string) => {
     setSelected((prev) => {
       const next = { ...prev };
@@ -196,6 +232,7 @@ export function useMatrix(): UseMatrixReturn {
 
   const clearAllSelections = useCallback(() => {
     setSelected({});
+    setSelectedMulti({});
     setHistory([]);
   }, []);
 
@@ -245,14 +282,16 @@ export function useMatrix(): UseMatrixReturn {
                 out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
             } else if (t.type === 'continuous') {
                 out.push({ group: t.group || "", traitName: t.name, type: "continuous", continuous: { ...t } });
+            } else if (t.type === 'categorical_multi') {
+                out.push({ group: t.group || "", traitName: t.name, type: "categorical_multi", multi: { ...t } });
             }
         }
         return out;
     }, [traits]);
-  
+
   return {
     rows, traits, matrixName, taxaCount,
-    selected, setBinary, setContinuous, setDerivedPick, clearDerived, clearAllSelections,
+    selected, selectedMulti, setBinary, setContinuous, setMulti, setDerivedPick, clearDerived, clearAllSelections,
     mode, setMode, algo, setAlgo, opts, setOpts,
     scores, suggs, suggMap, sortBy, setSortBy, suggAlgo, setSuggAlgo,
     pickKey, keys, activeKey, refreshKeys,

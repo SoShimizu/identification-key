@@ -7,7 +7,7 @@ import CandidatesPanel, { EngineScore } from "./components/panels/candidates/Can
 import ComparisonPanel from "./components/panels/comparison/ComparisonPanel";
 import TraitsTabsPanel from "./components/panels/traits/TraitsTabsPanel";
 import { STR } from "./i18n";
-import { Choice, Taxon } from "./api";
+import { Choice, Taxon, MultiChoice } from "./api";
 
 const fontLink = document.createElement('link');
 fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
@@ -17,7 +17,7 @@ document.head.appendChild(fontLink);
 export default function App() {
   const {
     matrixName, taxaCount, rows, traits,
-    selected, setBinary, setContinuous, setDerivedPick, clearDerived, clearAllSelections,
+    selected, selectedMulti, setBinary, setContinuous, setMulti, setDerivedPick, clearDerived, clearAllSelections,
     scores, suggMap, sortBy, setSortBy,
     mode, setMode,
     algo, setAlgo,
@@ -30,7 +30,7 @@ export default function App() {
   const [lang, setLang] = React.useState<"ja" | "en">("ja");
   const [comparisonList, setComparisonList] = React.useState<string[]>([]);
   const [comparisonOpen, setComparisonOpen] = React.useState(false);
-  
+
   const allTaxa = React.useMemo(() => {
     const matrixTaxa = scores.map(s => s.taxon);
     return matrixTaxa as Taxon[];
@@ -61,7 +61,7 @@ export default function App() {
     }),
     [themeMode]
   );
-  
+
   const suggRank: Record<string, number> = React.useMemo(() => {
     const m = suggMap || {};
     const entries = Object.entries(m);
@@ -128,8 +128,10 @@ export default function App() {
                 lang={lang}
                 rows={rows}
                 selected={selected as Record<string, number>}
+                selectedMulti={selectedMulti}
                 setBinary={(id, val, label) => setBinary(id, val as Choice, label)}
                 setContinuous={setContinuous}
+                setMulti={setMulti}
                 setDerivedPick={setDerivedPick}
                 clearDerived={clearDerived}
                 clearAllSelections={clearAllSelections}

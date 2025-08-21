@@ -7,20 +7,24 @@ export type AlgoOptions = main.ApplyOptions & {
   epsilonCut:     number;
   conflictPenalty: number;
   usePragmaticScore: boolean;
-  toleranceFactor: number; // Add this line
+  toleranceFactor: number;
+  categoricalAlgo: "jaccard" | "binary";
+  jaccardThreshold: number;
 };
 
 export const DEFAULT_OPTS: AlgoOptions = {
   defaultAlphaFP: 0.03,
   defaultBetaFN:  0.07,
-  gammaNAPenalty: 0.95,
+  gammaNAPenalty: 0.8,
   kappa:          1.0,
   epsilonCut:     1e-6,
   conflictPenalty: 1.0,
   usePragmaticScore: true,
-  toleranceFactor: 0.1, // Add default value (e.g., 10%)
+  toleranceFactor: 0.1,
+  categoricalAlgo: "jaccard",
+  jaccardThreshold: 0.5,
   wantInfoGain: false,
-  lambda: 1.0, 
+  lambda: 1.0,
   a0: 1.0,
   b0: 1.0,
   alphaFP: {},
@@ -54,10 +58,11 @@ export function clampAlgoOptions(o: AlgoOptions): AlgoOptions {
     ...o,
     defaultAlphaFP: clamp(o.defaultAlphaFP, 0, 0.2),
     defaultBetaFN:  clamp(o.defaultBetaFN,  0, 0.2),
-    gammaNAPenalty: clamp(o.gammaNAPenalty, 0.8, 1.0),
+    gammaNAPenalty: clamp(o.gammaNAPenalty, 0.0, 1.0),
     kappa:          clamp(o.kappa,          0, 5),
     epsilonCut:     clamp(o.epsilonCut,     1e-12, 1e-3),
     conflictPenalty: clamp(o.conflictPenalty, 0, 1),
-    toleranceFactor: clamp(o.toleranceFactor, 0, 0.5), // Add clamping for tolerance
+    toleranceFactor: clamp(o.toleranceFactor, 0, 0.5),
+    jaccardThreshold: clamp(o.jaccardThreshold, 0, 1),
   };
 }

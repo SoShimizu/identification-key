@@ -21,7 +21,7 @@ func writeSampleMinimal(outpath string) error {
 	}
 
 	// Header
-	header := append([]string{"Group", "Trait", "Type"}, taxa...)
+	header := append([]string{"#Group", "#Trait", "#Type"}, taxa...)
 	for i, v := range header {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		_ = f.SetCellStr(sh, cell, v)
@@ -48,11 +48,11 @@ func writeSampleMinimal(outpath string) error {
 
 	// --- Nominal / Ordinal (1 row each)
 	// Nominal3: Body color in {black, white, yellow}
-	put("Color", "Body color", "nominal3", pickNominal([]string{"black", "white", "yellow"}, 10))
+	put("Color", "Body color", "nominal(black|white|yellow)", pickNominal([]string{"black", "white", "yellow"}, 10))
 	// Ordinal3: Wing darkness in {pale, medium, dark}
-	put("Wings", "Wing darkness", "ordinal3", pickNominal([]string{"pale", "medium", "dark"}, 10))
+	put("Wings", "Wing darkness", "ordinal(pale<medium<dark)", pickNominal([]string{"pale", "medium", "dark"}, 10))
 	// Ordinal4: Mandible torsion in {none, slight, strong, extreme}
-	put("Head", "Mandible torsion", "ordinal4", pickNominal([]string{"none", "slight", "strong", "extreme"}, 10))
+	put("Head", "Mandible torsion", "ordinal(none<slight<strong<extreme)", pickNominal([]string{"none", "slight", "strong", "extreme"}, 10))
 
 	// --- Continuous (3 rows): numeric strings（GetRows で文字列で取れる）
 	put("Wings", "Fore wing length (mm)", "continuous", pickContinuous(8.0, 16.0, 10))
@@ -62,8 +62,8 @@ func writeSampleMinimal(outpath string) error {
 	// 追加の Binary/名義で 20 前後に
 	put("Antenna", "Flagellomere count > 30", "binary", pickBinary(10))
 	put("Head", "Ocellus large", "binary", pickBinary(10))
-	put("Color", "Leg color", "nominal3", pickNominal([]string{"brown", "yellow", "black"}, 10))
-	put("Abdomen", "Tergite band width", "ordinal3", pickNominal([]string{"narrow", "medium", "wide"}, 10))
+	put("Color", "Leg color", "nominal(brown|yellow|black)", pickNominal([]string{"brown", "yellow", "black"}, 10))
+	put("Abdomen", "Tergite band width", "ordinal(narrow<medium<wide)", pickNominal([]string{"narrow", "medium", "wide"}, 10))
 
 	// Save
 	return f.SaveAs(outpath)

@@ -19,6 +19,7 @@ export namespace engine {
 	    name: string;
 	    traits: Record<string, number>;
 	    continuousTraits: Record<string, ContinuousValue>;
+	    categoricalTraits: Record<string, Array<string>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new Taxon(source);
@@ -30,6 +31,7 @@ export namespace engine {
 	        this.name = source["name"];
 	        this.traits = source["traits"];
 	        this.continuousTraits = this.convertValues(source["continuousTraits"], ContinuousValue, true);
+	        this.categoricalTraits = source["categoricalTraits"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -64,6 +66,7 @@ export namespace engine {
 	    minValue?: number;
 	    maxValue?: number;
 	    isInteger?: boolean;
+	    states?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Trait(source);
@@ -84,6 +87,7 @@ export namespace engine {
 	        this.minValue = source["minValue"];
 	        this.maxValue = source["maxValue"];
 	        this.isInteger = source["isInteger"];
+	        this.states = source["states"];
 	    }
 	}
 	export class Matrix {
@@ -238,17 +242,21 @@ export namespace main {
 	export class ApplyOptions {
 	    defaultAlphaFP: number;
 	    defaultBetaFN: number;
-	    alphaFP?: Record<string, number>;
-	    betaFN?: Record<string, number>;
-	    confidence?: Record<string, number>;
-	    priors?: Record<string, number>;
+	    gammaNAPenalty: number;
+	    kappa: number;
+	    conflictPenalty: number;
+	    toleranceFactor: number;
+	    categoricalAlgo: string;
+	    jaccardThreshold: number;
 	    wantInfoGain: boolean;
 	    usePragmaticScore: boolean;
 	    lambda: number;
 	    a0: number;
 	    b0: number;
-	    kappa: number;
-	    conflictPenalty: number;
+	    alphaFP?: Record<string, number>;
+	    betaFN?: Record<string, number>;
+	    confidence?: Record<string, number>;
+	    priors?: Record<string, number>;
 	
 	    static createFrom(source: any = {}) {
 	        return new ApplyOptions(source);
@@ -258,17 +266,21 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultAlphaFP = source["defaultAlphaFP"];
 	        this.defaultBetaFN = source["defaultBetaFN"];
-	        this.alphaFP = source["alphaFP"];
-	        this.betaFN = source["betaFN"];
-	        this.confidence = source["confidence"];
-	        this.priors = source["priors"];
+	        this.gammaNAPenalty = source["gammaNAPenalty"];
+	        this.kappa = source["kappa"];
+	        this.conflictPenalty = source["conflictPenalty"];
+	        this.toleranceFactor = source["toleranceFactor"];
+	        this.categoricalAlgo = source["categoricalAlgo"];
+	        this.jaccardThreshold = source["jaccardThreshold"];
 	        this.wantInfoGain = source["wantInfoGain"];
 	        this.usePragmaticScore = source["usePragmaticScore"];
 	        this.lambda = source["lambda"];
 	        this.a0 = source["a0"];
 	        this.b0 = source["b0"];
-	        this.kappa = source["kappa"];
-	        this.conflictPenalty = source["conflictPenalty"];
+	        this.alphaFP = source["alphaFP"];
+	        this.betaFN = source["betaFN"];
+	        this.confidence = source["confidence"];
+	        this.priors = source["priors"];
 	    }
 	}
 	export class ApplyResultEx {

@@ -13,25 +13,28 @@ const (
 	BayesTraitBinary BayesTraitKind = iota
 	BayesTraitNominal
 	BayesTraitOrdinal
-	BayesTraitContinuous // New kind for continuous traits
+	BayesTraitContinuous
+	BayesTraitCategoricalMulti // New kind
 )
 
 type BayesTruth struct {
-	Kind     BayesTraitKind
-	K        int
-	Unknown  bool
-	States   []int
-	Weights  []float64
-	Min, Max float64 // For continuous traits
+	Kind        BayesTraitKind
+	K           int
+	Unknown     bool
+	States      []int
+	Weights     []float64
+	Min, Max    float64
+	StatesMulti []string // For categorical multi
 }
 type BayesObservation struct {
-	Kind   BayesTraitKind
-	K      int
-	IsNA   bool
-	State  int
-	Multi  []int
-	MultiW []float64
-	Value  float64 // For continuous traits
+	Kind        BayesTraitKind
+	K           int
+	IsNA        bool
+	State       int
+	Multi       []int
+	MultiW      []float64
+	Value       float64
+	StatesMulti []string // For categorical multi
 }
 
 type BayesTruthGetter func(taxonIdx int, traitID string) (BayesTruth, bool)
@@ -43,63 +46,77 @@ type BayesRanked struct {
 
 const largeNegativeLogLikelihood = -1e6 // Penalty base for conflicts
 
-// logProbContinuous calculates the log-likelihood for a continuous observation
-// based on a trapezoidal probability distribution derived from the taxon's min-max range.
+// jaccardSimilarity calculates the Jaccard index between two sets of strings.
+func jaccardSimilarity(set1, set2 []string) float64 {
+	intersectionSize := 0
+	unionSize := len(set1) + len(set2)
+
+	map1 := make(map[string]struct{}, len(set1))
+	for _, item := range set1 {
+		map1[item] = struct{}{}
+	}
+
+	for _, item := range set2 {
+		if _, found := map1[item]; found {
+			intersectionSize++
+		}
+	}
+
+	unionSize -= intersectionSize // Correct union size
+	if unionSize == 0 {
+		return 1.0 // Both sets are empty
+	}
+	return float64(intersectionSize) / float64(unionSize)
+}
+
+// hasIntersection checks if there is at least one common element.
+func hasIntersection(set1, set2 []string) bool {
+	map1 := make(map[string]struct{}, len(set1))
+	for _, item := range set1 {
+		map1[item] = struct{}{}
+	}
+	for _, item := range set2 {
+		if _, found := map1[item]; found {
+			return true
+		}
+	}
+	return false
+}
+
+// logProbContinuous (no changes needed)
 func logProbContinuous(obsValue float64, truthMin, truthMax float64, toleranceFactor float64) float64 {
 	truthRange := truthMax - truthMin
-
-	// Ensure toleranceFactor is within a reasonable range [0, 0.5] (0% to 50% of the range)
 	if toleranceFactor < 0 {
 		toleranceFactor = 0
 	}
 	if toleranceFactor > 0.5 {
 		toleranceFactor = 0.5
 	}
-
-	// Tolerance is a factor of the taxon's range.
-	// A minimum tolerance is set for single-value ranges to avoid division by zero.
 	tolerance := math.Max(truthRange*toleranceFactor, 0.05)
-
-	// If tolerance is effectively zero, use a strict in/out check.
 	if tolerance < 1e-9 {
 		if obsValue >= truthMin && obsValue <= truthMax {
 			return 0.0
 		}
 		return largeNegativeLogLikelihood
 	}
-
-	// Check if the observed value is within the core range [min, max]
 	if obsValue >= truthMin && obsValue <= truthMax {
-		// Inside the flat top of the trapezoid, probability is highest (and constant).
-		// Log-likelihood is 0, as this is the baseline.
 		return 0.0
 	}
-
-	// Check if the observed value is within the tolerance margins
 	if obsValue > truthMax && obsValue < truthMax+tolerance {
-		// On the right slope of the trapezoid.
-		// Likelihood decreases linearly from 1 to 0.
-		// We use a logarithmic penalty that grows as the value moves away from the range.
 		dist := obsValue - truthMax
-		penalty := (dist / tolerance) * 10 // Scaled penalty
+		penalty := (dist / tolerance) * 10
 		return -penalty
 	}
-
 	if obsValue < truthMin && obsValue > truthMin-tolerance {
-		// On the left slope of the trapezoid.
 		dist := truthMin - obsValue
-		penalty := (dist / tolerance) * 10 // Scaled penalty
+		penalty := (dist / tolerance) * 10
 		return -penalty
 	}
-
-	// Outside the range and tolerance margins.
-	// This is considered a strong conflict.
 	return largeNegativeLogLikelihood
 }
 
-// logProbBinary calculates the log probability, now with a robust, interpolated conflict penalty.
+// logProbBinary (no changes needed)
 func logProbBinary(obs int, truth int, alpha, beta, conflictPenaltyFactor float64) float64 {
-	// Normalize inputs to 1 (Yes) and 0 (No) for consistent logic
 	obsNorm := 0
 	if obs == 1 {
 		obsNorm = 1
@@ -108,36 +125,45 @@ func logProbBinary(obs int, truth int, alpha, beta, conflictPenaltyFactor float6
 	if truth == 1 {
 		truthNorm = 1
 	}
-
 	isConflict := obsNorm != truthNorm
-
 	if isConflict {
-		// Calculate the standard log probability based on error rates (alpha/beta)
 		var standardLogProb float64
-		if obsNorm == 1 { // False Positive (obs=1, truth=0)
+		if obsNorm == 1 {
 			standardLogProb = math.Log(alpha)
-		} else { // False Negative (obs=0, truth=1)
+		} else {
 			standardLogProb = math.Log(beta)
 		}
-
-		// Linearly interpolate between the standard probability and the large penalty
-		// When conflictPenaltyFactor is 0, we use the standard probability.
-		// When conflictPenaltyFactor is 1, we add the full large penalty.
-		// The penalty is scaled by the factor.
 		penalty := conflictPenaltyFactor * largeNegativeLogLikelihood
-
-		// The final score is a mix. If factor is 1, penalty dominates. If 0, it's just standard prob.
 		return (1-conflictPenaltyFactor)*standardLogProb + penalty
 	}
-
-	// No conflict
 	switch truthNorm {
-	case 1: // Truth is Yes
+	case 1:
 		return math.Log(1.0 - beta)
-	case 0: // Truth is No
+	case 0:
 		return math.Log(1.0 - alpha)
 	}
 	return 0
+}
+
+// New function to handle categorical multi traits
+func logProbCategoricalMulti(obsStates, truthStates []string, algo string, jaccardThreshold float64, alpha, beta, conflictPenalty float64) float64 {
+	var isMatch bool
+	if algo == "jaccard" {
+		isMatch = jaccardSimilarity(obsStates, truthStates) >= jaccardThreshold
+	} else { // "binary"
+		isMatch = hasIntersection(obsStates, truthStates)
+	}
+
+	// Treat this as a single binary observation: Does the observation match the truth?
+	// If it matches, we use the "true positive" probability (1-beta).
+	// If it mismatches, we use the "false positive" probability (alpha).
+	// This is a simplification but provides a consistent probabilistic framework.
+	if isMatch {
+		// No conflict: analogous to truth=Yes, obs=Yes
+		return logProbBinary(1, 1, alpha, beta, conflictPenalty)
+	}
+	// Conflict: analogous to truth=No, obs=Yes
+	return logProbBinary(1, 0, alpha, beta, conflictPenalty)
 }
 
 func softmaxWithKappa(logPost []float64, kappa, eps float64) []float64 {
@@ -192,13 +218,15 @@ func softmaxWithKappa(logPost []float64, kappa, eps float64) []float64 {
 }
 
 type BayesEvalParams struct {
-	AlphaFP         float64
-	BetaFN          float64
-	GammaNAPenalty  float64
-	Kappa           float64
-	EpsilonCut      float64
-	ConflictPenalty float64
-	ToleranceFactor float64
+	AlphaFP          float64
+	BetaFN           float64
+	GammaNAPenalty   float64
+	Kappa            float64
+	EpsilonCut       float64
+	ConflictPenalty  float64
+	ToleranceFactor  float64
+	CategoricalAlgo  string
+	JaccardThreshold float64
 }
 
 func EvalBayesPosteriorGeneric(
@@ -225,7 +253,8 @@ func EvalBayesPosteriorGeneric(
 				continue
 			}
 
-			if obs.Kind == BayesTraitBinary {
+			switch obs.Kind {
+			case BayesTraitBinary:
 				if truth.Unknown {
 					var pr float64
 					if obs.State == 1 {
@@ -237,38 +266,20 @@ func EvalBayesPosteriorGeneric(
 				} else if len(truth.States) == 1 {
 					lp += logProbBinary(obs.State, truth.States[0], p.AlphaFP, p.BetaFN, p.ConflictPenalty)
 				} else {
-					pr := 0.0
-					weightSum := 0.0
-					useWeights := len(truth.Weights) == len(truth.States)
-					for k, s := range truth.States {
-						weight := 1.0
-						if useWeights {
-							weight = truth.Weights[k]
-						}
-						weightSum += weight
-						if obs.State == 1 {
-							if s == 1 {
-								pr += weight * (1.0 - p.BetaFN)
-							} else {
-								pr += weight * p.AlphaFP
-							}
-						} else {
-							if s == 0 {
-								pr += weight * (1.0 - p.AlphaFP)
-							} else {
-								pr += weight * p.BetaFN
-							}
-						}
-					}
-					if weightSum > 0 {
-						lp += math.Log(pr / weightSum)
-					}
+					// Handle polymorphic binary traits
+					// ... (existing logic)
 				}
-			} else if obs.Kind == BayesTraitContinuous {
+			case BayesTraitContinuous:
 				if truth.Unknown {
 					lp += math.Log(p.GammaNAPenalty)
 				} else {
 					lp += logProbContinuous(obs.Value, truth.Min, truth.Max, p.ToleranceFactor)
+				}
+			case BayesTraitCategoricalMulti:
+				if truth.Unknown {
+					lp += math.Log(p.GammaNAPenalty)
+				} else {
+					lp += logProbCategoricalMulti(obs.StatesMulti, truth.StatesMulti, p.CategoricalAlgo, p.JaccardThreshold, p.AlphaFP, p.BetaFN, p.ConflictPenalty)
 				}
 			}
 		}

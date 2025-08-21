@@ -3,14 +3,16 @@ import { engine, main } from "../wailsjs/go/models";
 import { GetMatrix } from "../wailsjs/go/main/App";
 
 // For binary traits, -1, 0, 1. For continuous, the float value.
-export type Choice = number; 
+// For categorical multi, it's a bitmask or similar, but we'll use a string array for the selection state.
+export type Choice = number;
+export type MultiChoice = string[];
 
 // Goの `engine.Trait` 構造体と型を一致させる
 export type Trait = {
   id: string;
   name: string;
   group: string;
-  type: "binary" | "derived" | "nominal_parent" | "continuous";
+  type: "binary" | "derived" | "nominal_parent" | "continuous" | "categorical_multi";
   parent?: string;
   state?: string;
   difficulty?: number;
@@ -19,7 +21,8 @@ export type Trait = {
   helpImages?: string[];
   minValue?: number;
   maxValue?: number;
-  isInteger?: boolean; // Add this line
+  isInteger?: boolean;
+  states?: string[]; // For categorical_multi
 };
 
 export type Taxon = engine.Taxon;
