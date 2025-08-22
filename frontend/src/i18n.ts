@@ -2,7 +2,7 @@
 
 export const STR = {
   ja: {
-    appTitle: "ClavisID",
+    appTitle: "MyKeyLogue",
     panels: {
       candidates: "候補タクサ",
       traits_unselected: "未選択の形質",
@@ -184,7 +184,7 @@ export const STR = {
       },
   },
   en: {
-    appTitle: "ClavisID",
+    appTitle: "MyKeyLogue",
     panels: {
         candidates: "Candidates",
         traits_unselected: "Unselected Traits",

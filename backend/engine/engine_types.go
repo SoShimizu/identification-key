@@ -1,6 +1,12 @@
 // backend/engine/engine_types.go
 package engine
 
+// Dependency holds parsed dependency rule information.
+type Dependency struct {
+	ParentTraitID string `json:"parentTraitId"`
+	RequiredState string `json:"requiredState"`
+}
+
 // ContinuousValue represents a min-max range for a continuous trait.
 type ContinuousValue struct {
 	Min float64 `json:"min"`
@@ -16,22 +22,22 @@ const (
 )
 
 type Trait struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Group      string   `json:"group"`
-	Type       string   `json:"type"` // "binary", "derived", "nominal_parent", "continuous", "categorical_multi"
-	Parent     string   `json:"parent,omitempty"`
-	State      string   `json:"state,omitempty"`
-	Difficulty float64  `json:"difficulty,omitempty"`
-	Risk       float64  `json:"risk,omitempty"`
-	HelpText   string   `json:"helpText,omitempty"`
-	HelpImages []string `json:"helpImages,omitempty"`
-	// For continuous traits
-	MinValue  float64 `json:"minValue,omitempty"`
-	MaxValue  float64 `json:"maxValue,omitempty"`
-	IsInteger bool    `json:"isInteger,omitempty"` // True if the trait only takes integer values
-	// For categorical_multi traits
-	States []string `json:"states,omitempty"`
+	ID               string      `json:"id"`
+	TraitID          string      `json:"traitId,omitempty"` // User-defined ID from Excel
+	Name             string      `json:"name"`
+	Group            string      `json:"group"`
+	Type             string      `json:"type"`
+	Parent           string      `json:"parent,omitempty"`           // For derived traits
+	ParentDependency *Dependency `json:"parentDependency,omitempty"` // For dependency rules
+	State            string      `json:"state,omitempty"`
+	Difficulty       float64     `json:"difficulty,omitempty"`
+	Risk             float64     `json:"risk,omitempty"`
+	HelpText         string      `json:"helpText,omitempty"`
+	HelpImages       []string    `json:"helpImages,omitempty"`
+	MinValue         float64     `json:"minValue,omitempty"`
+	MaxValue         float64     `json:"maxValue,omitempty"`
+	IsInteger        bool        `json:"isInteger,omitempty"`
+	States           []string    `json:"states,omitempty"`
 }
 
 type Taxon struct {
@@ -70,7 +76,7 @@ type TraitSuggestion struct {
 	Name       string      `json:"name"`
 	Group      string      `json:"group"`
 	IG         float64     `json:"ig"`
-	MaxIG      float64     `json:"max_ig"` // NEW: To store the max possible IG for a state
+	MaxIG      float64     `json:"max_ig"`
 	ECR        float64     `json:"ecr"`
 	Gini       float64     `json:"gini"`
 	Entropy    float64     `json:"entropy"`
@@ -85,7 +91,7 @@ type AlgoOptions struct {
 	GammaNAPenalty         float64 `json:"gammaNAPenalty"`
 	WantInfoGain           bool    `json:"wantInfoGain"`
 	UsePragmaticScore      bool    `json:"usePragmaticScore"`
-	RecommendationStrategy string  `json:"recommendationStrategy"` // NEW: "expected_ig" or "max_ig"
+	RecommendationStrategy string  `json:"recommendationStrategy"`
 	Lambda                 float64 `json:"lambda"`
 	A0                     float64 `json:"a0"`
 	B0                     float64 `json:"b0"`

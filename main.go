@@ -26,7 +26,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "ClavisID",
+		Title:  "MyKeyLogue",
 		Width:  1280,
 		Height: 800,
 		AssetServer: &assetserver.Options{

@@ -15,6 +15,37 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+// Regex to parse parent dependency string like T001[note]="Yes" or T002=orange
+// BUG FIX: Updated regex to correctly ignore optional bracketed text.
+var reParentDependency = regexp.MustCompile(`^([a-zA-Z0-9_]+)(?:\[.*?\])?\s*=\s*(?:"([^"]+)"|([^"\s=]+))$`)
+
+// Helper function to parse the #Dependency column
+func parseParentDependency(s string) *Dependency {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+
+	matches := reParentDependency.FindStringSubmatch(s)
+	// Successful match will have 4 elements: the full string, group 1 (ID), group 2 (quoted state), group 3 (unquoted state)
+	if len(matches) != 4 {
+		log.Printf("[EXCEL PARSER] Invalid dependency format: %s", s)
+		return nil
+	}
+
+	requiredState := matches[2] // Assume quoted state first
+	if requiredState == "" {
+		requiredState = matches[3] // Fallback to unquoted state
+	}
+
+	dep := &Dependency{
+		ParentTraitID: matches[1],
+		RequiredState: requiredState,
+	}
+
+	return dep
+}
+
 type LoadSummary struct {
 	Dir         string `json:"dir"`
 	Traits      int    `json:"traits"`
@@ -24,18 +55,14 @@ type LoadSummary struct {
 }
 
 var reFullWidthDigit = regexp.MustCompile(`[０-９－]+`)
+var whitespaceReplacer = strings.NewReplacer("\u00A0", " ", "\t", " ", "　", " ")
 
-// A replacer to clean up various whitespace characters, including non-breaking spaces.
-var whitespaceReplacer = strings.NewReplacer("\u00A0", " ", "\t", " ", "　", " ") // Added full-width space
-
-// cleanString is a new helper function to standardize string cleaning.
 func cleanString(s string) string {
 	s = toHalfWidthNums(s)
 	s = whitespaceReplacer.Replace(s)
 	return strings.TrimSpace(s)
 }
 
-// parseRange parses a string like "5.0" or "1.4-1.5" into a ContinuousValue.
 func parseRange(s string) (ContinuousValue, bool) {
 	s = cleanString(s)
 	s = strings.ReplaceAll(s, ",", "")
@@ -58,7 +85,7 @@ func parseRange(s string) (ContinuousValue, bool) {
 			return ContinuousValue{}, false
 		}
 		if min > max {
-			min, max = max, min // Swap if order is wrong
+			min, max = max, min
 		}
 		return ContinuousValue{Min: min, Max: max}, true
 	}
@@ -86,8 +113,6 @@ func parseTernaryCell(s string) Ternary {
 		return No
 	case "1", "y", "yes", "true", "はい", "有り", "あり", "present", "x", "×", "○", "◯", "✓":
 		return Yes
-	case "0", "na", "unknown", "不明", "未", "":
-		fallthrough
 	default:
 		return NA
 	}
@@ -137,7 +162,6 @@ func getRawCell(rows [][]string, r, c int) string {
 	if c < 0 || r < 0 || r >= len(rows) || c >= len(rows[r]) {
 		return ""
 	}
-	// Return the raw string, cleaning will be done by callers.
 	return rows[r][c]
 }
 
@@ -148,7 +172,7 @@ const (
 	kindNominal
 	kindOrdinal
 	kindContinuous
-	kindCategoricalMulti // New kind
+	kindCategoricalMulti
 )
 
 type typeSpec struct {
@@ -206,7 +230,7 @@ func parseTypeSpec(s string) typeSpec {
 	if strings.HasPrefix(x, "continuous") {
 		return typeSpec{kind: kindContinuous}
 	}
-	if strings.HasPrefix(x, "categorical_multi") { // New type handling
+	if strings.HasPrefix(x, "categorical_multi") {
 		return typeSpec{kind: kindCategoricalMulti}
 	}
 	return typeSpec{kind: kindBinary}
@@ -220,9 +244,6 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	}
 	defer f.Close()
 
-	if len(f.WorkBook.Sheets.Sheet) == 0 {
-		return nil, errors.New("sheet not found")
-	}
 	sheet := f.WorkBook.Sheets.Sheet[0].Name
 	rows, err := f.GetRows(sheet)
 	if err != nil || len(rows) < 2 || len(rows[0]) < 1 {
@@ -234,11 +255,9 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 		header[0] = strings.TrimPrefix(header[0], "\ufeff")
 	}
 
-	colIdxGroup, colIdxTrait, colIdxType, colIdxDifficulty, colIdxRisk, colIdxParent, colIdxHelpText, colIdxHelpImage := -1, -1, -1, -1, -1, -1, -1, -1
+	colIdxGroup, colIdxTrait, colIdxType, colIdxTraitID, colIdxDifficulty, colIdxRisk, colIdxParent, colIdxDependency, colIdxHelpText, colIdxHelpImage := -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
 
-	taxonNames := []string{}
-	taxonCols := []int{}
-
+	taxonNames, taxonCols := []string{}, []int{}
 	for i, h := range header {
 		cleanHeader := strings.ToLower(cleanString(h))
 		if strings.HasPrefix(cleanHeader, "#") {
@@ -249,12 +268,16 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				colIdxTrait = i
 			case "#type":
 				colIdxType = i
+			case "#traitid":
+				colIdxTraitID = i
 			case "#difficulty":
 				colIdxDifficulty = i
 			case "#risk":
 				colIdxRisk = i
 			case "#parent":
 				colIdxParent = i
+			case "#dependency":
+				colIdxDependency = i
 			case "#helptext":
 				colIdxHelpText = i
 			case "#helpimages":
@@ -274,29 +297,28 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	}
 	log.Printf("[EXCEL PARSER] Found %d taxa.", len(taxonNames))
 
-	m.Name = filepath.Base(path)
-	m.Traits = []Trait{}
-	m.Taxa = []Taxon{}
+	m.Name, m.Traits, m.Taxa = filepath.Base(path), []Trait{}, []Taxon{}
 	taxonIndex := map[string]int{}
 	for i, nm := range taxonNames {
 		m.Taxa = append(m.Taxa, Taxon{
-			ID:                nm,
-			Name:              nm,
+			ID: nm, Name: nm,
 			Traits:            make(map[string]Ternary),
 			ContinuousTraits:  make(map[string]ContinuousValue),
-			CategoricalTraits: make(map[string][]string), // Initialize new map
+			CategoricalTraits: make(map[string][]string),
 		})
 		taxonIndex[nm] = i
 	}
 
 	for r := 1; r < len(rows); r++ {
-		group := cleanString(getRawCell(rows, r, colIdxGroup))
 		traitName := cleanString(getRawCell(rows, r, colIdxTrait))
 		if traitName == "" {
 			continue
 		}
-		spec := parseTypeSpec(cleanString(getRawCell(rows, r, colIdxType)))
 
+		group := cleanString(getRawCell(rows, r, colIdxGroup))
+		spec := parseTypeSpec(cleanString(getRawCell(rows, r, colIdxType)))
+		traitIDStr := cleanString(getRawCell(rows, r, colIdxTraitID))
+		dependency := parseParentDependency(cleanString(getRawCell(rows, r, colIdxDependency)))
 		difficultyVal := parseDifficulty(cleanString(getRawCell(rows, r, colIdxDifficulty)))
 		riskVal := parseRisk(cleanString(getRawCell(rows, r, colIdxRisk)))
 		parentName := cleanString(getRawCell(rows, r, colIdxParent))
@@ -304,33 +326,19 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 		helpImageStr := cleanString(getRawCell(rows, r, colIdxHelpImage))
 		var helpImages []string
 		if helpImageStr != "" {
-			parts := regexp.MustCompile(`[ ,;]+`).Split(helpImageStr, -1)
-			for _, part := range parts {
-				if part != "" {
-					helpImages = append(helpImages, part)
-				}
-			}
+			helpImages = regexp.MustCompile(`\s*[,;]\s*`).Split(helpImageStr, -1)
 		}
 
 		switch spec.kind {
 		case kindBinary:
-			traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			internalID := fmt.Sprintf("t%04d", len(m.Traits)+1)
 			m.Traits = append(m.Traits, Trait{
-				ID:         traitID,
-				Name:       traitName,
-				Group:      group,
-				Type:       "binary",
-				Difficulty: difficultyVal,
-				Risk:       riskVal,
-				Parent:     parentName,
-				HelpText:   helpText,
-				HelpImages: helpImages,
+				ID: internalID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "binary",
+				Difficulty: difficultyVal, Risk: riskVal, Parent: parentName, ParentDependency: dependency,
+				HelpText: helpText, HelpImages: helpImages,
 			})
 			for i, col := range taxonCols {
-				valStr := getRawCell(rows, r, col)
-				val := parseTernaryCell(valStr)
-				idx := taxonIndex[taxonNames[i]]
-				m.Taxa[idx].Traits[traitID] = val
+				m.Taxa[taxonIndex[taxonNames[i]]].Traits[internalID] = parseTernaryCell(getRawCell(rows, r, col))
 			}
 
 		case kindNominal, kindOrdinal:
@@ -339,12 +347,12 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				uniq := map[string]struct{}{}
 				for _, col := range taxonCols {
 					raw := cleanString(getRawCell(rows, r, col))
-					if raw == "" || parseTernaryCell(raw) != NA {
-						continue
+					if raw != "" {
+						uniq[raw] = struct{}{}
 					}
-					uniq[raw] = struct{}{}
 				}
-				if len(uniq) < 2 {
+				if len(uniq) == 0 {
+					log.Printf("[EXCEL PARSER] Warning: Nominal trait '%s' has no states. Skipping.", traitName)
 					continue
 				}
 				for k := range uniq {
@@ -354,23 +362,20 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 			parentTraitID := fmt.Sprintf("t%04d_parent", len(m.Traits)+1)
-			m.Traits = append(m.Traits, Trait{ID: parentTraitID, Name: traitName, Group: group, Type: "nominal_parent", Difficulty: difficultyVal, Risk: riskVal, HelpText: helpText, HelpImages: helpImages})
+			m.Traits = append(m.Traits, Trait{
+				ID: parentTraitID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "nominal_parent",
+				Difficulty: difficultyVal, Risk: riskVal, ParentDependency: dependency,
+				HelpText: helpText, HelpImages: helpImages, States: states,
+			})
 
 			derivedIDs := make([]string, len(states))
 			for i, st := range states {
 				tid := fmt.Sprintf("t%04d", len(m.Traits)+1)
 				derivedIDs[i] = tid
 				m.Traits = append(m.Traits, Trait{
-					ID:         tid,
-					Name:       fmt.Sprintf("%s = %s", traitName, st),
-					Group:      group,
-					Type:       "derived",
-					Parent:     traitName,
-					State:      st,
-					Difficulty: difficultyVal,
-					Risk:       riskVal,
-					HelpText:   helpText,
-					HelpImages: helpImages,
+					ID: tid, Name: fmt.Sprintf("%s = %s", traitName, st), Group: group, Type: "derived",
+					Parent: traitName, State: st, Difficulty: difficultyVal, Risk: riskVal,
+					HelpText: helpText, HelpImages: helpImages,
 				})
 			}
 			for i, col := range taxonCols {
@@ -398,17 +403,14 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 		case kindContinuous:
-			traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			internalID := fmt.Sprintf("t%04d", len(m.Traits)+1)
 			overallMin, overallMax := math.Inf(1), math.Inf(-1)
-			hasValues := false
-			isInteger := true
+			hasValues, isInteger := false, true
 
 			for i, col := range taxonCols {
-				valStr := getRawCell(rows, r, col)
-				if val, ok := parseRange(valStr); ok {
+				if val, ok := parseRange(getRawCell(rows, r, col)); ok {
 					idx := taxonIndex[taxonNames[i]]
-					m.Taxa[idx].ContinuousTraits[traitID] = val
-
+					m.Taxa[idx].ContinuousTraits[internalID] = val
 					if val.Min < overallMin {
 						overallMin = val.Min
 					}
@@ -416,7 +418,6 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 						overallMax = val.Max
 					}
 					hasValues = true
-
 					if val.Min != math.Floor(val.Min) || val.Max != math.Floor(val.Max) {
 						isInteger = false
 					}
@@ -425,21 +426,15 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 
 			if hasValues {
 				m.Traits = append(m.Traits, Trait{
-					ID:         traitID,
-					Name:       traitName,
-					Group:      group,
-					Type:       "continuous",
-					Difficulty: difficultyVal,
-					Risk:       riskVal,
-					HelpText:   helpText,
-					HelpImages: helpImages,
-					MinValue:   overallMin,
-					MaxValue:   overallMax,
-					IsInteger:  isInteger,
+					ID: internalID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "continuous",
+					Difficulty: difficultyVal, Risk: riskVal, ParentDependency: dependency,
+					HelpText: helpText, HelpImages: helpImages,
+					MinValue: overallMin, MaxValue: overallMax, IsInteger: isInteger,
 				})
 			}
+
 		case kindCategoricalMulti:
-			traitID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			internalID := fmt.Sprintf("t%04d", len(m.Traits)+1)
 			allStates := make(map[string]struct{})
 			for i, col := range taxonCols {
 				valStr := getRawCell(rows, r, col)
@@ -449,16 +444,13 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				parts := strings.Split(valStr, ";")
 				var values []string
 				for _, p := range parts {
-					trimmed := cleanString(p)
-					if trimmed != "" {
+					if trimmed := cleanString(p); trimmed != "" {
 						values = append(values, trimmed)
 						allStates[trimmed] = struct{}{}
 					}
 				}
 				if len(values) > 0 {
-					idx := taxonIndex[taxonNames[i]]
-					m.Taxa[idx].CategoricalTraits[traitID] = values
-					log.Printf("[EXCEL PARSER] Parsed for Taxon '%s', Trait '%s': Raw='%s', Parsed Values=%v", taxonNames[i], traitName, valStr, values)
+					m.Taxa[taxonIndex[taxonNames[i]]].CategoricalTraits[internalID] = values
 				}
 			}
 
@@ -467,31 +459,22 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				states = append(states, state)
 			}
 			sort.Strings(states)
-			log.Printf("[EXCEL PARSER] Trait '%s', All possible states found: %v", traitName, states)
 
 			m.Traits = append(m.Traits, Trait{
-				ID:         traitID,
-				Name:       traitName,
-				Group:      group,
-				Type:       "categorical_multi",
-				Difficulty: difficultyVal,
-				Risk:       riskVal,
-				HelpText:   helpText,
-				HelpImages: helpImages,
-				States:     states,
+				ID: internalID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "categorical_multi",
+				Difficulty: difficultyVal, Risk: riskVal, ParentDependency: dependency,
+				HelpText: helpText, HelpImages: helpImages, States: states,
 			})
 		}
 	}
 
-	// NEW: Load metadata from the "TaxaMeta" sheet if it exists
 	metaSheetName := "TaxaMeta"
 	if metaSheetRows, err := f.GetRows(metaSheetName); err == nil && len(metaSheetRows) > 1 {
 		log.Printf("[EXCEL PARSER] Found 'TaxaMeta' sheet. Loading details...")
 		header := metaSheetRows[0]
 		colIdxName, colIdxDesc, colIdxRefs, colIdxImages := -1, -1, -1, -1
 		for i, h := range header {
-			cleanHeader := strings.ToLower(cleanString(h))
-			switch cleanHeader {
+			switch strings.ToLower(cleanString(h)) {
 			case "#taxonname":
 				colIdxName = i
 			case "#description":
@@ -506,15 +489,10 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 		if colIdxName != -1 {
 			for r := 1; r < len(metaSheetRows); r++ {
 				taxonName := cleanString(getRawCell(metaSheetRows, r, colIdxName))
-				if taxonName == "" {
-					continue
-				}
-
 				if idx, ok := taxonIndex[taxonName]; ok {
 					m.Taxa[idx].Description = getRawCell(metaSheetRows, r, colIdxDesc)
 					m.Taxa[idx].References = getRawCell(metaSheetRows, r, colIdxRefs)
-					imageStr := cleanString(getRawCell(metaSheetRows, r, colIdxImages))
-					if imageStr != "" {
+					if imageStr := cleanString(getRawCell(metaSheetRows, r, colIdxImages)); imageStr != "" {
 						m.Taxa[idx].Images = regexp.MustCompile(`[ ,;]+`).Split(imageStr, -1)
 					}
 				}

@@ -2,8 +2,7 @@
 import { useEffect, useState } from "react";
 import { main } from "../../wailsjs/go/models";
 
-// Define a version for the settings object. Increment this when defaults are changed.
-const SETTINGS_VERSION = 5; // Increment version for the new strategy default
+const SETTINGS_VERSION = 6;
 
 export type AlgoOptions = main.ApplyOptions & {
   settingsVersion?: number;
@@ -12,6 +11,7 @@ export type AlgoOptions = main.ApplyOptions & {
   conflictPenalty: number;
   usePragmaticScore: boolean;
   recommendationStrategy: "expected_ig" | "max_ig";
+  applyDependencies: boolean; // NEW
   toleranceFactor: number;
   categoricalAlgo: "jaccard" | "binary";
   jaccardThreshold: number;
@@ -26,7 +26,8 @@ export const DEFAULT_OPTS: AlgoOptions = {
   epsilonCut:     1e-6,
   conflictPenalty: 0.5,
   usePragmaticScore: true,
-  recommendationStrategy: "max_ig", // CHANGE DEFAULT: Default to breakthrough mode for experts
+  recommendationStrategy: "max_ig",
+  applyDependencies: true, // NEW
   toleranceFactor: 0.1,
   categoricalAlgo: "binary", 
   jaccardThreshold: 0.01, 
@@ -48,15 +49,8 @@ export function useAlgoOpts(matrixName: string) {
       const raw = localStorage.getItem(KEY(matrixName));
       if (raw) {
         const parsed = JSON.parse(raw);
-
         if (!parsed.settingsVersion || parsed.settingsVersion < SETTINGS_VERSION) {
-          console.log("Old settings detected. Migrating to new defaults.");
-          const migratedOpts = {
-            ...DEFAULT_OPTS, 
-            ...parsed,       
-            settingsVersion: SETTINGS_VERSION,
-            recommendationStrategy: DEFAULT_OPTS.recommendationStrategy, 
-          };
+          const migratedOpts = { ...DEFAULT_OPTS, ...parsed, settingsVersion: SETTINGS_VERSION };
           return migratedOpts;
         }
         return { ...DEFAULT_OPTS, ...parsed };

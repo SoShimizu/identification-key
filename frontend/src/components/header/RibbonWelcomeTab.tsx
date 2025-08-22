@@ -291,7 +291,7 @@ export default function RibbonWelcomeTab({ lang }: Props) {
     >
       {/* Title */}
       <Typography variant="h4" gutterBottom sx={{ fontWeight: "bold" }}>
-        {ja ? "ClavisIDへようこそ！" : "Welcome to ClavisID!"}
+        {ja ? "MyKeyLogueへようこそ！" : "Welcome to MyKeyLogue!"}
       </Typography>
       <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
         {ja
@@ -300,8 +300,8 @@ export default function RibbonWelcomeTab({ lang }: Props) {
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         {ja
-          ? "ClavisIDは、形質行列（マトリクス）に基づくインタラクティブ検索表ツールです。形質は形態に限らず、生態・行動・生息環境・分布なども同定形質として利用できます。順不同で観察可能な形質を入力すれば、候補が動的に絞り込まれます。"
-          : "ClavisID is built on trait matrices. Traits need not be morphological only—ecology, behaviour, habitat, and distribution can be used for identification as well. Provide any observable characters in any order to dynamically narrow candidates."}
+          ? "MyKeyLogueは、形質行列（マトリクス）に基づくインタラクティブ検索表ツールです。形質は形態に限らず、生態・行動・生息環境・分布なども同定形質として利用できます。順不同で観察可能な形質を入力すれば、候補が動的に絞り込まれます。"
+          : "MyKeyLogue is built on trait matrices. Traits need not be morphological only—ecology, behaviour, habitat, and distribution can be used for identification as well. Provide any observable characters in any order to dynamically narrow candidates."}
       </Typography>
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -523,8 +523,8 @@ export default function RibbonWelcomeTab({ lang }: Props) {
                 <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
                   <strong>Shimizu S. 2025.</strong>{" "}
                   {ja
-                    ? "ClavisID: 分類学的同定のための知的・インタラクティブ・マルチアクセスキー。"
-                    : "ClavisID: An Intelligent, Interactive Multi-Access Key for Taxonomic Identification."}
+                    ? "MyKeyLogue: 分類学的同定のための知的・インタラクティブ・マルチアクセスキー。"
+                    : "MyKeyLogue: An Intelligent, Interactive Multi-Access Key for Taxonomic Identification."}
                   <Link
                     href="https://github.com/soshimizu/identification-key"
                     target="_blank"

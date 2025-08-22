@@ -1,19 +1,29 @@
 // frontend/src/api.ts
 import { engine, main } from "../wailsjs/go/models";
-import { GetMatrix, GetTaxonDetails } from "../wailsjs/go/main/App"; // Import GetTaxonDetails
+import { GetMatrix, GetTaxonDetails } from "../wailsjs/go/main/App";
 
 // For binary traits, -1, 0, 1. For continuous, the float value.
 // For categorical multi, it's a bitmask or similar, but we'll use a string array for the selection state.
 export type Choice = number;
 export type MultiChoice = string[];
 
+// NEW: Define the structure for a dependency rule
+export type Dependency = {
+    parentTraitId: string;
+    requiredState: string;
+    requiredTernary: number;
+    isBinary: boolean;
+};
+
 // Goの `engine.Trait` 構造体と型を一致させる
 export type Trait = {
   id: string;
+  traitId?: string; // User-defined ID
   name: string;
   group: string;
   type: "binary" | "derived" | "nominal_parent" | "continuous" | "categorical_multi";
-  parent?: string;
+  parent?: string; // For derived traits
+  parentDependency?: Dependency; // NEW: For dependency rules
   state?: string;
   difficulty?: number;
   risk?: number;
@@ -40,7 +50,9 @@ export type Matrix = {
 
 export type TaxonScore = engine.TaxonScore;
 export type StateProb = engine.StateProb;
-export type TraitSuggestion = engine.TraitSuggestion;
+export type TraitSuggestion = engine.TraitSuggestion & {
+    max_ig?: number;
+};
 export type ApplyOptions = main.ApplyOptions;
 export type ApplyResult = main.ApplyResultEx;
 
@@ -51,7 +63,6 @@ export async function getMatrix(): Promise<Matrix> {
   return m as unknown as Matrix;
 }
 
-// New function to get taxon details
 export async function getTaxonDetails(taxonId: string): Promise<Taxon | null> {
     try {
         const taxon = await GetTaxonDetails(taxonId);
