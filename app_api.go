@@ -7,9 +7,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 
 	"my-id-key/backend/engine"
 
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -151,7 +155,7 @@ func (a *App) ApplyFiltersAlgoOpt(req ApplyRequest) (*ApplyResultEx, error) {
 		GammaNAPenalty:         req.Opts.GammaNAPenalty,
 		WantInfoGain:           req.Opts.WantInfoGain,
 		UsePragmaticScore:      req.Opts.UsePragmaticScore,
-		RecommendationStrategy: req.Opts.RecommendationStrategy, // BUG FIX: Pass strategy to engine
+		RecommendationStrategy: req.Opts.RecommendationStrategy,
 		Lambda:                 req.Opts.Lambda,
 		A0:                     req.Opts.A0,
 		B0:                     req.Opts.B0,
@@ -180,4 +184,328 @@ func (a *App) ApplyFiltersAlgoOpt(req ApplyRequest) (*ApplyResultEx, error) {
 		Scores:      res.Scores,
 		Suggestions: res.Suggestions,
 	}, nil
+}
+
+// SaveReportDialog displays a save file dialog for the report.
+func (a *App) SaveReportDialog(defaultName string) (string, error) {
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultDirectory: a.reportsDir,
+		DefaultFilename:  defaultName,
+		Title:            "Save Identification Report",
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "Text Files (*.txt)",
+				Pattern:     "*.txt",
+			},
+		},
+	})
+}
+
+// GenerateIdentificationReport generates a human-readable text report of the identification session and saves it to the path chosen by the user.
+func (a *App) GenerateIdentificationReport(req ReportRequest, path string) error {
+
+	s := getReportStrings(req.Lang)
+
+	var sb strings.Builder
+
+	// Header
+	sb.WriteString("==================================================\n")
+	sb.WriteString(fmt.Sprintf("       %s\n", s.Title))
+	sb.WriteString("==================================================\n\n")
+	sb.WriteString(fmt.Sprintf("%s: %s\n", s.ReportID, uuid.New().String()))
+	sb.WriteString(fmt.Sprintf("%s: %s\n", s.Date, time.Now().Format("2006-01-02 15:04:05 MST")))
+	sb.WriteString(fmt.Sprintf("%s: %s\n", s.MatrixFile, req.MatrixName))
+	sb.WriteString(fmt.Sprintf("%s: %s\n", s.Algorithm, req.Algorithm))
+	sb.WriteString("\n")
+
+	// Parameters
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("%s\n", s.ParametersUsed))
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Alpha, req.Options.DefaultAlphaFP))
+	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Beta, req.Options.DefaultBetaFN))
+	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Gamma, req.Options.GammaNAPenalty))
+	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Kappa, req.Options.Kappa))
+	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.ConflictPenalty, req.Options.ConflictPenalty))
+	sb.WriteString(fmt.Sprintf("  - %s: %.2f%%\n", s.Tolerance, req.Options.ToleranceFactor*100))
+	sb.WriteString("\n")
+
+	// Observation History
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("%s\n", s.ObservationHistory))
+	sb.WriteString("--------------------------------------------------\n")
+	if len(req.History) == 0 {
+		sb.WriteString(fmt.Sprintf("  %s\n", s.NoObservations))
+	} else {
+		sort.SliceStable(req.History, func(i, j int) bool {
+			return req.History[i].Timestamp < req.History[j].Timestamp
+		})
+		for i, item := range req.History {
+			sb.WriteString(fmt.Sprintf("  %d. %s: %s\n", i+1, item.TraitName, item.Selection))
+		}
+	}
+	sb.WriteString("\n")
+
+	// Final Results
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("%s\n", s.FinalRanking))
+	sb.WriteString("--------------------------------------------------\n")
+	if len(req.FinalScores) == 0 {
+		sb.WriteString(fmt.Sprintf("  %s\n", s.NoCandidates))
+	} else {
+		header := fmt.Sprintf("%-6s %-40s %-15s %-12s %-10s\n", s.RankHeader, s.TaxonHeader, s.ScoreHeader, s.ConflictsHeader, s.MatchSupportHeader)
+		sb.WriteString(header)
+		sb.WriteString(strings.Repeat("-", 85) + "\n")
+		for i, score := range req.FinalScores {
+			if i >= 10 {
+				sb.WriteString(fmt.Sprintf("  "+s.AndMore+"\n", len(req.FinalScores)-10))
+				break
+			}
+			probStr := fmt.Sprintf("%.4f", score.Post)
+			matchSupport := fmt.Sprintf("%d/%d", score.Match, score.Support)
+			sb.WriteString(fmt.Sprintf("%-6d %-40s %-15s %-12d %-10s\n", i+1, score.Taxon.Name, probStr, score.Conflicts, matchSupport))
+		}
+	}
+	sb.WriteString("\n")
+
+	// Confidence Score
+	var confidence string
+	if len(req.FinalScores) >= 2 {
+		if req.FinalScores[1].Post > 1e-9 { // Avoid division by zero
+			ratio := req.FinalScores[0].Post / req.FinalScores[1].Post
+			if ratio > 2.0 {
+				confidence = fmt.Sprintf(s.ConfidenceHigh, ratio)
+			} else {
+				confidence = s.ConfidenceContested
+			}
+		} else {
+			confidence = s.ConfidenceVeryHigh
+		}
+	} else if len(req.FinalScores) == 1 {
+		confidence = s.ConfidenceAbsolute
+	} else {
+		confidence = s.ConfidenceNA
+	}
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("%s\n", s.ConfidenceTitle))
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("  %s\n\n", confidence))
+
+	// Citation Note
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("%s\n", s.CitationTitle))
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("  %s\n\n", s.CitationText))
+
+	sb.WriteString("==================================================\n")
+	sb.WriteString(fmt.Sprintf("               %s\n", s.EndOfReport))
+	sb.WriteString("==================================================\n")
+
+	return os.WriteFile(path, []byte(sb.String()), 0644)
+}
+
+// GetJustificationForTaxon returns a breakdown of which traits match, conflict, or are unobserved for a given taxon.
+func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, selectedMulti map[string][]string) (*Justification, error) {
+	if a.currentMatrix == nil {
+		return nil, fmt.Errorf("no matrix loaded")
+	}
+
+	var targetTaxon *engine.Taxon
+	for i := range a.currentMatrix.Taxa {
+		if a.currentMatrix.Taxa[i].ID == taxonID {
+			targetTaxon = &a.currentMatrix.Taxa[i]
+			break
+		}
+	}
+
+	if targetTaxon == nil {
+		return nil, fmt.Errorf("taxon with ID '%s' not found", taxonID)
+	}
+
+	traitMap := make(map[string]engine.Trait)
+	parentTraits := make(map[string]engine.Trait)
+	childrenMap := make(map[string][]engine.Trait)
+
+	for _, t := range a.currentMatrix.Traits {
+		traitMap[t.ID] = t
+		if t.Type == "nominal_parent" {
+			parentTraits[t.Name] = t
+		}
+		if t.Parent != "" {
+			childrenMap[t.Parent] = append(childrenMap[t.Parent], t)
+		}
+	}
+
+	justification := &Justification{}
+
+	// Create a map of all user selections for easier lookup
+	allSelections := make(map[string]bool)
+	for k := range selected {
+		allSelections[k] = true
+	}
+	for k := range selectedMulti {
+		allSelections[k] = true
+	}
+
+	for _, trait := range a.currentMatrix.Traits {
+		// Skip derived traits, they are handled via their parent
+		if trait.Type == "derived" {
+			continue
+		}
+
+		userChoiceStr := "Unobserved"
+		taxonStateStr := "NA"
+		status := "unobserved"
+
+		// Check if this trait (or its children) were selected by the user
+		isSelected := false
+		if _, ok := allSelections[trait.ID]; ok {
+			isSelected = true
+		} else if trait.Type == "nominal_parent" {
+			for _, child := range childrenMap[trait.Name] {
+				if _, ok := allSelections[child.ID]; ok {
+					isSelected = true
+					break
+				}
+			}
+		}
+
+		if !isSelected {
+			justification.Unobserved = append(justification.Unobserved, JustificationItem{
+				TraitName:      trait.Name,
+				TraitGroupName: trait.Group,
+				Status:         "unobserved",
+			})
+			continue
+		}
+
+		// --- Process selected traits ---
+		switch trait.Type {
+		case "binary":
+			userChoice, _ := selected[trait.ID]
+			userChoiceStr = ternaryToString(engine.Ternary(userChoice))
+			taxonState, _ := targetTaxon.Traits[trait.ID]
+			taxonStateStr = ternaryToString(taxonState)
+			if userChoice != 0 && taxonState != 0 {
+				if userChoice == int(taxonState) {
+					status = "match"
+				} else {
+					status = "conflict"
+				}
+			} else {
+				status = "neutral"
+			}
+
+		case "continuous":
+			userValue, _ := selected[trait.ID]
+			userChoiceStr = fmt.Sprintf("%v", userValue)
+			taxonValue, ok := targetTaxon.ContinuousTraits[trait.ID]
+			if ok {
+				taxonStateStr = fmt.Sprintf("[%.2f, %.2f]", taxonValue.Min, taxonValue.Max)
+				if float64(userValue) >= taxonValue.Min && float64(userValue) <= taxonValue.Max {
+					status = "match"
+				} else {
+					status = "conflict"
+				}
+			} else {
+				taxonStateStr = "NA"
+				status = "neutral"
+			}
+
+		case "categorical_multi":
+			userStates, _ := selectedMulti[trait.ID]
+			userChoiceStr = strings.Join(userStates, "; ")
+			taxonStates, ok := targetTaxon.CategoricalTraits[trait.ID]
+			if ok {
+				taxonStateStr = strings.Join(taxonStates, "; ")
+				if hasIntersection(userStates, taxonStates) {
+					status = "match"
+				} else {
+					status = "conflict"
+				}
+			} else {
+				taxonStateStr = "NA"
+				status = "neutral"
+			}
+
+		case "nominal_parent":
+			var chosenChild engine.Trait
+			for _, child := range childrenMap[trait.Name] {
+				if val, ok := selected[child.ID]; ok && val == 1 {
+					chosenChild = child
+					break
+				}
+			}
+			userChoiceStr = chosenChild.State
+
+			var taxonChildState engine.Trait
+			for _, child := range childrenMap[trait.Name] {
+				if val, ok := targetTaxon.Traits[child.ID]; ok && val == 1 {
+					taxonChildState = child
+					break
+				}
+			}
+
+			if taxonChildState.ID != "" {
+				taxonStateStr = taxonChildState.State
+				if chosenChild.ID == taxonChildState.ID {
+					status = "match"
+				} else {
+					status = "conflict"
+				}
+			} else {
+				taxonStateStr = "NA"
+				status = "neutral"
+			}
+		}
+
+		item := JustificationItem{
+			TraitName:      trait.Name,
+			TraitGroupName: trait.Group,
+			UserChoice:     userChoiceStr,
+			TaxonState:     taxonStateStr,
+			Status:         status,
+		}
+
+		if status == "match" {
+			justification.Matches = append(justification.Matches, item)
+		} else if status == "conflict" {
+			justification.Conflicts = append(justification.Conflicts, item)
+		}
+	}
+
+	justification.MatchCount = len(justification.Matches)
+	justification.ConflictCount = len(justification.Conflicts)
+
+	return justification, nil
+}
+
+// --- Helper Functions ---
+
+func ternaryToString(t engine.Ternary) string {
+	switch t {
+	case engine.Yes:
+		return "Yes"
+	case engine.No:
+		return "No"
+	case engine.NA:
+		return "NA"
+	default:
+		return "Unknown"
+	}
+}
+
+// hasIntersection checks if there is at least one common element.
+// This is a local copy from the engine package to avoid cyclic dependencies or unnecessary exports.
+func hasIntersection(set1, set2 []string) bool {
+	map1 := make(map[string]struct{}, len(set1))
+	for _, item := range set1 {
+		map1[item] = struct{}{}
+	}
+	for _, item := range set2 {
+		if _, found := map1[item]; found {
+			return true
+		}
+	}
+	return false
 }

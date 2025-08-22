@@ -3,11 +3,15 @@ import React, { useState } from "react";
 import {
   Paper, Box, Typography, Table, TableHead, TableRow, TableCell,
   TableBody, TableContainer, LinearProgress, Tooltip, Chip,
-  Stack, Checkbox, Button, FormControlLabel, Switch
+  Stack, Checkbox, Button, FormControlLabel, Switch, Modal, IconButton
 } from "@mui/material";
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { STR } from "../../../i18n";
-import { Taxon } from "../../../api";
+import { Taxon, Justification, MultiChoice, Choice } from "../../../api";
+import { GetJustificationForTaxon } from "../../../../wailsjs/go/main/App";
+import JustificationPanel from "./JustificationPanel";
+
 
 export type EngineScore = {
   rank?: number;
@@ -35,7 +39,8 @@ const ScoreCell = ({ score }: { score: number }) => (
 
 export default function CandidatesPanel({
   title, rows, totalTaxa, lang = "ja", algo,
-  comparisonList, setComparisonList, onCompareClick, onTaxonSelect
+  comparisonList, setComparisonList, onCompareClick, onTaxonSelect,
+  selected, selectedMulti
 }: {
   title?: string;
   rows: EngineScore[];
@@ -46,9 +51,16 @@ export default function CandidatesPanel({
   setComparisonList: React.Dispatch<React.SetStateAction<string[]>>;
   onCompareClick: () => void;
   onTaxonSelect: (taxon: Taxon) => void;
+  selected: Record<string, Choice>;
+  selectedMulti: Record<string, MultiChoice>;
 }) {
   const T = STR[lang].candidatesPanel;
   const [showMatchSupport, setShowMatchSupport] = useState<boolean>(false);
+  
+  const [justificationOpen, setJustificationOpen] = useState(false);
+  const [currentJustification, setCurrentJustification] = useState<Justification | null>(null);
+  const [loadingJustification, setLoadingJustification] = useState(false);
+  const [currentTargetTaxon, setCurrentTargetTaxon] = useState<Taxon | null>(null);
 
   const handleCompareChange = (taxonId: string, checked: boolean) => {
     if (checked) {
@@ -67,6 +79,22 @@ export default function CandidatesPanel({
     setComparisonList([]);
   };
 
+  const handleWhyClick = async (e: React.MouseEvent, taxon: Taxon) => {
+      e.stopPropagation();
+      setLoadingJustification(true);
+      setJustificationOpen(true);
+      setCurrentTargetTaxon(taxon);
+      try {
+          const result = await GetJustificationForTaxon(taxon.id, selected, selectedMulti);
+          setCurrentJustification(result as Justification);
+      } catch (error) {
+          console.error("Failed to get justification:", error);
+      } finally {
+          setLoadingJustification(false);
+      }
+  };
+
+
   const scoreHeader = algo === 'bayes' ? T.header_post_prob : T.header_score;
   const scoreTooltip = algo === 'bayes' ? T.tooltip_post : T.tooltip_score;
   
@@ -75,6 +103,7 @@ export default function CandidatesPanel({
   const isAllSelected = rowCount > 0 && numSelected === rowCount;
 
   return (
+    <>
     <Paper sx={{ height: "100%", display: "flex", flexDirection: "column", p: 1.5 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 0.5, mb: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
@@ -117,6 +146,7 @@ export default function CandidatesPanel({
               <TableCell sx={{ width: 80 }}><Tooltip title={T.tooltip_delta}><span>{T.header_delta}</span></Tooltip></TableCell>
               <TableCell sx={{ width: 70 }} align="center"><Tooltip title={<Typography sx={{whiteSpace: 'pre-line'}}>{T.tooltip_conflicts}</Typography>}><span>{T.header_conflicts}</span></Tooltip></TableCell>
               {showMatchSupport && <TableCell sx={{ width: 110 }}><Tooltip title={<Typography sx={{whiteSpace: 'pre-line'}}>{T.tooltip_match_support}</Typography>}><span>{T.header_match_support}</span></Tooltip></TableCell>}
+              <TableCell sx={{ width: 50 }} align="center">Why?</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -152,11 +182,44 @@ export default function CandidatesPanel({
                   )}
                 </TableCell>
                 {showMatchSupport && <TableCell>{`${r.match ?? 0}/${r.support ?? 0}`}</TableCell>}
+                <TableCell align="center">
+                    <Tooltip title={`Why is ${r.taxon?.name} ranked here?`}>
+                        <IconButton size="small" onClick={(e) => handleWhyClick(e, r.taxon)}>
+                            <HelpOutlineIcon fontSize="small"/>
+                        </IconButton>
+                    </Tooltip>
+                </TableCell>
               </TableRow>
             )})}
           </TableBody>
         </Table>
       </TableContainer>
     </Paper>
+    <Modal open={justificationOpen} onClose={() => setJustificationOpen(false)}>
+        <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '80vw',
+            maxWidth: '1200px',
+            maxHeight: '85vh',
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 1,
+            display: 'flex',
+            flexDirection: 'column'
+        }}>
+            <JustificationPanel
+                taxon={currentTargetTaxon}
+                justification={currentJustification}
+                loading={loadingJustification}
+                onClose={() => setJustificationOpen(false)}
+                lang={lang}
+            />
+        </Box>
+    </Modal>
+    </>
   );
 }

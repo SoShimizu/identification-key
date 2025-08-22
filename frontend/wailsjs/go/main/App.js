@@ -10,12 +10,20 @@ export function EnsureMyKeysAndSamples() {
   return window['go']['main']['App']['EnsureMyKeysAndSamples']();
 }
 
+export function GenerateIdentificationReport(arg1, arg2) {
+  return window['go']['main']['App']['GenerateIdentificationReport'](arg1, arg2);
+}
+
 export function GetCurrentKeyName() {
   return window['go']['main']['App']['GetCurrentKeyName']();
 }
 
 export function GetHelpImage(arg1) {
   return window['go']['main']['App']['GetHelpImage'](arg1);
+}
+
+export function GetJustificationForTaxon(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetJustificationForTaxon'](arg1, arg2, arg3);
 }
 
 export function GetMatrix() {
@@ -32,6 +40,10 @@ export function ListMyKeys() {
 
 export function PickKey(arg1) {
   return window['go']['main']['App']['PickKey'](arg1);
+}
+
+export function SaveReportDialog(arg1) {
+  return window['go']['main']['App']['SaveReportDialog'](arg1);
 }
 
 export function Startup(arg1) {

@@ -55,6 +55,33 @@ export type TraitSuggestion = engine.TraitSuggestion & {
 };
 export type ApplyOptions = main.ApplyOptions;
 export type ApplyResult = main.ApplyResultEx;
+export type ReportRequest = main.ReportRequest;
+
+
+// NEW: Types for Justification ("Why?" feature)
+export type JustificationItem = {
+    traitName: string;
+    traitGroupName: string;
+    userChoice: string;
+    taxonState: string;
+    status: "match" | "conflict" | "neutral" | "unobserved";
+}
+
+export type Justification = {
+    matches: JustificationItem[];
+    conflicts: JustificationItem[];
+    unobserved: JustificationItem[];
+    matchCount: number;
+    conflictCount: number;
+}
+
+// NEW: Type for history items for report generation
+export type HistoryItem = {
+    traitName: string;
+    selection: string;
+    timestamp: number;
+}
+
 
 // ---- Wails バインディング呼び出し ----
 

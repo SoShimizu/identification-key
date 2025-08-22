@@ -67,6 +67,7 @@ export default function App() {
     algo, setAlgo,
     opts, setOpts,
     keys, activeKey, pickKey, refreshKeys,
+    history, undo, redo, canUndo, canRedo,
   } = useMatrix();
 
   const [themeMode, setThemeMode] = React.useState<"light" | "dark">("dark");
@@ -174,6 +175,12 @@ export default function App() {
           themeMode={themeMode} setThemeMode={setThemeMode}
           opts={opts} setOpts={setOpts}
           matrixName={matrixName}
+          history={history}
+          scores={scores}
+          undo={undo}
+          redo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
          <Box sx={{ flex: 1, p: 2, gap: 1, display: 'flex', flexDirection: 'row', height: 'calc(100vh - 48px)' }}>
             <Box sx={{ width: `${leftPanelWidth}%`, display: 'flex', flexDirection: 'column', gap: 1, minHeight: 0, minWidth: '300px' }}>
@@ -188,6 +195,8 @@ export default function App() {
                         setComparisonList={setComparisonList}
                         onCompareClick={() => setComparisonOpen(true)}
                         onTaxonSelect={handleTaxonSelect}
+                        selected={selected}
+                        selectedMulti={selectedMulti}
                     />
                 </Box>
                 

@@ -16,10 +16,14 @@ import (
 )
 
 // Regex to parse parent dependency string like T001[note]="Yes" or T002=orange
-// BUG FIX: Updated regex to correctly ignore optional bracketed text.
+// This regex correctly ignores optional bracketed text to extract the core TraitID.
 var reParentDependency = regexp.MustCompile(`^([a-zA-Z0-9_]+)(?:\[.*?\])?\s*=\s*(?:"([^"]+)"|([^"\s=]+))$`)
 
-// Helper function to parse the #Dependency column
+// Regex to normalize a TraitID by removing any bracketed notes, e.g., "FW01[note]" -> "FW01"
+var reNormalizeTraitID = regexp.MustCompile(`^[^\[]+`)
+
+// Helper function to parse the #Dependency column.
+// It extracts the parent TraitID and the required state.
 func parseParentDependency(s string) *Dependency {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -44,6 +48,15 @@ func parseParentDependency(s string) *Dependency {
 	}
 
 	return dep
+}
+
+// Helper function to normalize a TraitID by removing bracketed notes.
+func normalizeTraitID(id string) string {
+	trimmedID := strings.TrimSpace(id)
+	if match := reNormalizeTraitID.FindString(trimmedID); match != "" {
+		return strings.TrimSpace(match)
+	}
+	return trimmedID
 }
 
 type LoadSummary struct {
@@ -317,7 +330,10 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 
 		group := cleanString(getRawCell(rows, r, colIdxGroup))
 		spec := parseTypeSpec(cleanString(getRawCell(rows, r, colIdxType)))
-		traitIDStr := cleanString(getRawCell(rows, r, colIdxTraitID))
+
+		// Normalizes the TraitID by removing bracketed notes. This is the key fix.
+		traitIDStr := normalizeTraitID(getRawCell(rows, r, colIdxTraitID))
+
 		dependency := parseParentDependency(cleanString(getRawCell(rows, r, colIdxDependency)))
 		difficultyVal := parseDifficulty(cleanString(getRawCell(rows, r, colIdxDifficulty)))
 		riskVal := parseRisk(cleanString(getRawCell(rows, r, colIdxRisk)))

@@ -8,9 +8,13 @@ export function ApplyFiltersAlgoOpt(arg1:main.ApplyRequest):Promise<main.ApplyRe
 
 export function EnsureMyKeysAndSamples():Promise<void>;
 
+export function GenerateIdentificationReport(arg1:main.ReportRequest,arg2:string):Promise<void>;
+
 export function GetCurrentKeyName():Promise<string>;
 
 export function GetHelpImage(arg1:string):Promise<string>;
+
+export function GetJustificationForTaxon(arg1:string,arg2:Record<string, number>,arg3:Record<string, Array<string>>):Promise<main.Justification>;
 
 export function GetMatrix():Promise<engine.Matrix>;
 
@@ -19,5 +23,7 @@ export function GetTaxonDetails(arg1:string):Promise<engine.Taxon>;
 export function ListMyKeys():Promise<Array<main.KeyInfo>>;
 
 export function PickKey(arg1:string):Promise<void>;
+
+export function SaveReportDialog(arg1:string):Promise<string>;
 
 export function Startup(arg1:context.Context):Promise<void>;

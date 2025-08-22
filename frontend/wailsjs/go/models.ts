@@ -401,6 +401,81 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class HistoryItem {
+	    traitName: string;
+	    selection: string;
+	    timestamp: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.traitName = source["traitName"];
+	        this.selection = source["selection"];
+	        this.timestamp = source["timestamp"];
+	    }
+	}
+	export class JustificationItem {
+	    traitName: string;
+	    traitGroupName: string;
+	    userChoice: string;
+	    taxonState: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new JustificationItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.traitName = source["traitName"];
+	        this.traitGroupName = source["traitGroupName"];
+	        this.userChoice = source["userChoice"];
+	        this.taxonState = source["taxonState"];
+	        this.status = source["status"];
+	    }
+	}
+	export class Justification {
+	    matches: JustificationItem[];
+	    conflicts: JustificationItem[];
+	    unobserved: JustificationItem[];
+	    matchCount: number;
+	    conflictCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Justification(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.matches = this.convertValues(source["matches"], JustificationItem);
+	        this.conflicts = this.convertValues(source["conflicts"], JustificationItem);
+	        this.unobserved = this.convertValues(source["unobserved"], JustificationItem);
+	        this.matchCount = source["matchCount"];
+	        this.conflictCount = source["conflictCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class KeyInfo {
 	    name: string;
 	    path: string;
@@ -420,6 +495,46 @@ export namespace main {
 	        this.ext = source["ext"];
 	        this.modTime = source["modTime"];
 	    }
+	}
+	export class ReportRequest {
+	    lang: string;
+	    matrixName: string;
+	    algorithm: string;
+	    options: ApplyOptions;
+	    history: HistoryItem[];
+	    finalScores: engine.TaxonScore[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ReportRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.lang = source["lang"];
+	        this.matrixName = source["matrixName"];
+	        this.algorithm = source["algorithm"];
+	        this.options = this.convertValues(source["options"], ApplyOptions);
+	        this.history = this.convertValues(source["history"], HistoryItem);
+	        this.finalScores = this.convertValues(source["finalScores"], engine.TaxonScore);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

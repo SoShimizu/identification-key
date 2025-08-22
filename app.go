@@ -23,6 +23,7 @@ type App struct {
 
 	// Keys dir & current selection
 	keysDir       string
+	reportsDir    string // NEW: for reports
 	currentKey    string
 	currentPath   string
 	currentMatrix *engine.Matrix
@@ -50,8 +51,12 @@ func (a *App) startup(ctx context.Context) {
 	// keysDirを絶対パスで設定
 	a.keysDir = filepath.Join(a.basePath, "keys")
 	runtime.LogInfof(a.ctx, "Keys directory set to: %s", a.keysDir)
-
 	_ = os.MkdirAll(a.keysDir, 0o755)
+
+	// NEW: Create and set reports directory
+	a.reportsDir = filepath.Join(a.basePath, "my_identification_reports")
+	runtime.LogInfof(a.ctx, "Reports directory set to: %s", a.reportsDir)
+	_ = os.MkdirAll(a.reportsDir, 0o755)
 }
 
 // ---- internal helpers ----

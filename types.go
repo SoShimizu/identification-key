@@ -50,3 +50,38 @@ type ApplyResultEx struct {
 	Scores      []engine.TaxonScore      `json:"scores"`
 	Suggestions []engine.TraitSuggestion `json:"suggestions"`
 }
+
+// JustificationItem 「なぜ？」機能で各形質の状態を示すための構造体
+type JustificationItem struct {
+	TraitName      string `json:"traitName"`
+	TraitGroupName string `json:"traitGroupName"`
+	UserChoice     string `json:"userChoice"`
+	TaxonState     string `json:"taxonState"`
+	Status         string `json:"status"` // "match", "conflict", "unobserved"
+}
+
+// Justification 「なぜ？」機能の全体的な結果
+type Justification struct {
+	Matches       []JustificationItem `json:"matches"`
+	Conflicts     []JustificationItem `json:"conflicts"`
+	Unobserved    []JustificationItem `json:"unobserved"`
+	MatchCount    int                 `json:"matchCount"`
+	ConflictCount int                 `json:"conflictCount"`
+}
+
+// HistoryItem ユーザーの操作履歴の各項目
+type HistoryItem struct {
+	TraitName string `json:"traitName"`
+	Selection string `json:"selection"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// ReportRequest レポート生成APIへのリクエスト
+type ReportRequest struct {
+	Lang        string              `json:"lang"` // NEW: Language setting
+	MatrixName  string              `json:"matrixName"`
+	Algorithm   string              `json:"algorithm"`
+	Options     ApplyOptions        `json:"options"`
+	History     []HistoryItem       `json:"history"`
+	FinalScores []engine.TaxonScore `json:"finalScores"`
+}
