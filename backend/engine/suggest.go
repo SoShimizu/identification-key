@@ -104,7 +104,6 @@ func compatibleBinary(val Ternary, wantYes bool) bool {
 	return val == No
 }
 
-// ✨ AlgoOptions を引数に追加
 func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[string]int, opt AlgoOptions) []TraitSuggestion {
 	if len(m.Taxa) == 0 || len(m.Traits) == 0 || len(post) != len(m.Taxa) {
 		return nil
@@ -138,7 +137,6 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 
 	out := make([]TraitSuggestion, 0, len(filtered))
 	for _, d := range filtered {
-		// ... (py, labels, gini, ent, expH, expRed, ig calculation remains the same)
 		var py []float64
 		var labels []string
 
@@ -177,6 +175,8 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 
 		expH := 0.0
 		expRed := 0.0
+		maxStateIG := -1.0 // NEW: To track the highest possible IG from any state
+
 		for s := range py {
 			postY := make([]float64, len(post))
 			if d.yesNo {
@@ -199,7 +199,14 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 				}
 			}
 			normalize(postY)
-			expH += py[s] * shannon(postY)
+
+			stateH := shannon(postY)
+			stateIG := Hnow - stateH
+			if stateIG > maxStateIG {
+				maxStateIG = stateIG
+			}
+
+			expH += py[s] * stateH
 			if cNow > 0 {
 				cY := countAbove(postY, tau)
 				expRed += py[s] * (1.0 - float64(cY)/float64(cNow))
@@ -227,12 +234,16 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 			}
 		}
 
-		// ✨ UsePragmaticScore の値に応じてスコア計算を切り替える
 		var score float64
+		baseScore := ig // Default to expected IG
+		if opt.RecommendationStrategy == "max_ig" {
+			baseScore = maxStateIG // Use max possible IG for "breakthrough" mode
+		}
+
 		if opt.UsePragmaticScore {
-			score = (ig / difficulty) * (1.0 - risk)
+			score = (baseScore / difficulty) * (1.0 - risk)
 		} else {
-			score = ig // 純粋な情報利得を使用
+			score = baseScore
 		}
 
 		ps := make([]StateProb, len(py))
@@ -244,6 +255,7 @@ func SuggestTraitsBayes(m *Matrix, post []float64, tau float64, selected map[str
 			Name:       d.name,
 			Group:      d.group,
 			IG:         ig,
+			MaxIG:      maxStateIG,
 			ECR:        expRed,
 			Gini:       gini,
 			Entropy:    ent,

@@ -3,14 +3,15 @@ import { useEffect, useState } from "react";
 import { main } from "../../wailsjs/go/models";
 
 // Define a version for the settings object. Increment this when defaults are changed.
-const SETTINGS_VERSION = 3;
+const SETTINGS_VERSION = 5; // Increment version for the new strategy default
 
 export type AlgoOptions = main.ApplyOptions & {
-  settingsVersion?: number; // Add version number
+  settingsVersion?: number;
   gammaNAPenalty: number;
   epsilonCut:     number;
   conflictPenalty: number;
   usePragmaticScore: boolean;
+  recommendationStrategy: "expected_ig" | "max_ig";
   toleranceFactor: number;
   categoricalAlgo: "jaccard" | "binary";
   jaccardThreshold: number;
@@ -23,8 +24,9 @@ export const DEFAULT_OPTS: AlgoOptions = {
   gammaNAPenalty: 0.8,
   kappa:          1.0,
   epsilonCut:     1e-6,
-  conflictPenalty: 0.5, // MODIFIED: Default is now more lenient
+  conflictPenalty: 0.5,
   usePragmaticScore: true,
+  recommendationStrategy: "max_ig", // CHANGE DEFAULT: Default to breakthrough mode for experts
   toleranceFactor: 0.1,
   categoricalAlgo: "binary", 
   jaccardThreshold: 0.01, 
@@ -47,18 +49,13 @@ export function useAlgoOpts(matrixName: string) {
       if (raw) {
         const parsed = JSON.parse(raw);
 
-        // If saved settings are from an older version, migrate them.
         if (!parsed.settingsVersion || parsed.settingsVersion < SETTINGS_VERSION) {
           console.log("Old settings detected. Migrating to new defaults.");
           const migratedOpts = {
             ...DEFAULT_OPTS, 
             ...parsed,       
-            // Re-assert the new defaults for keys that have been intentionally changed
             settingsVersion: SETTINGS_VERSION,
-            categoricalAlgo: DEFAULT_OPTS.categoricalAlgo,
-            gammaNAPenalty: DEFAULT_OPTS.gammaNAPenalty,
-            jaccardThreshold: DEFAULT_OPTS.jaccardThreshold,
-            conflictPenalty: DEFAULT_OPTS.conflictPenalty, // Ensure the new default is applied
+            recommendationStrategy: DEFAULT_OPTS.recommendationStrategy, 
           };
           return migratedOpts;
         }

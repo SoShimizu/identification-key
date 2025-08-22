@@ -1,20 +1,9 @@
-// frontend/src/components/panels/traits/HelpDisplay.tsx
+// frontend/src/components/panels/taxa/TaxonDetailPanel.tsx
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Paper, Stack, Modal, IconButton, Tabs, Tab, Grid, Divider } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { Trait } from '../../../api';
+import { Taxon } from '../../../api';
 import { GetHelpImage } from '../../../../wailsjs/go/main/App';
-import { STR } from '../../../i18n';
-
-type Props = {
-  trait?: Trait;
-  lang: "ja" | "en";
-};
-
-// Component to safely render HTML content
-const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
-    return <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: content }} />;
-};
 
 const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ filename, onClick }) => {
     const [imageData, setImageData] = useState<string | null>(null);
@@ -25,13 +14,9 @@ const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ 
         setImageData(null);
         GetHelpImage(filename)
             .then((base64Data: string) => {
-                if (base64Data) {
-                    setImageData(`data:image/png;base64,${base64Data}`);
-                }
+                if (base64Data) setImageData(`data:image/png;base64,${base64Data}`);
             })
-            .finally(() => {
-                setLoading(false);
-            });
+            .finally(() => setLoading(false));
     }, [filename]);
 
     if (loading) return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, width: '100%', bgcolor: 'action.hover', borderRadius: 1 }}><CircularProgress size={24} /></Box>;
@@ -44,21 +29,26 @@ const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ 
     );
 };
 
-export default function HelpDisplay({ trait, lang }: Props) {
+// Component to safely render HTML content with left alignment
+const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
+    return <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, textAlign: 'left' }} dangerouslySetInnerHTML={{ __html: content }} />;
+};
+
+
+export default function TaxonDetailPanel({ taxon }: { taxon: Taxon }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImage, setModalImage] = useState<string | null>(null);
   
-  const T = STR[lang].panels;
-
   const tabs = [];
-  if (trait?.helpText) tabs.push("Note");
-  if (trait?.helpImages && trait.helpImages.length > 0) tabs.push("Images");
-  
+  if (taxon.description) tabs.push("Description");
+  if (taxon.references) tabs.push("References");
+  if (taxon.images && taxon.images.length > 0) tabs.push("Images");
+
   const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
       setActiveTab(0);
-  }, [trait]);
+  }, [taxon]);
 
 
   const handleImageClick = (filename: string) => {
@@ -69,43 +59,32 @@ export default function HelpDisplay({ trait, lang }: Props) {
         }
     });
   };
-
-  if (!trait) {
-    return (
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
-        <Typography color="text.secondary">{T.help_placeholder}</Typography>
-      </Box>
-    );
-  }
-
-  const hasHelpContent = tabs.length > 0;
+  
+  const hasContent = tabs.length > 0;
 
   return (
     <>
-      <Paper variant="outlined" sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{flexShrink: 0}}>
-            <Typography variant="caption" color="text.secondary">{trait.group}</Typography>
-            <Typography variant="h6" component="h3">{trait.name}</Typography>
-        </Box>
+      <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}>
+        <Typography variant="h6" component="h3" sx={{ flexShrink: 0 }}>{taxon.name}</Typography>
+        <Divider sx={{ my: 1, flexShrink: 0 }} />
         
-        {!hasHelpContent ? (
+        {!hasContent ? (
             <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography color="text.secondary">この形質に関する補助材料はありません。</Typography>
+                 <Typography color="text.secondary">No detailed information available for this taxon.</Typography>
             </Box>
         ) : (
             <>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 1, flexShrink: 0 }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
                     <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} variant="fullWidth">
-                        {tabs.map(label => <Tab key={label} label={label} />)}
+                       {tabs.map(label => <Tab key={label} label={label} />)}
                     </Tabs>
                 </Box>
                 <Box sx={{ flex: 1, overflowY: 'auto', pt: 2 }}>
-                    {tabs[activeTab] === "Note" && trait.helpText && (
-                        <HtmlRenderer content={trait.helpText} />
-                    )}
-                    {tabs[activeTab] === "Images" && trait.helpImages && (
-                        <Grid container spacing={2}>
-                            {trait.helpImages.map((filename: string) => (
+                    {tabs[activeTab] === "Description" && <HtmlRenderer content={taxon.description || ''} />}
+                    {tabs[activeTab] === "References" && <HtmlRenderer content={taxon.references || ''} />}
+                    {tabs[activeTab] === "Images" && taxon.images && (
+                         <Grid container spacing={2}>
+                            {taxon.images.map(filename => (
                                 <Grid item xs={12} sm={6} md={4} key={filename}>
                                     <ImageWithLoader filename={filename} onClick={() => handleImageClick(filename)} />
                                 </Grid>
@@ -118,7 +97,7 @@ export default function HelpDisplay({ trait, lang }: Props) {
       </Paper>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ position: 'relative', maxHeight: '90vh', maxWidth: '90vw' }}>
-            <IconButton onClick={() => setModalOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)' }}>
+            <IconButton onClick={() => setModalOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': {bgcolor: 'rgba(0,0,0,0.8)'} }}>
                 <CloseIcon />
             </IconButton>
             <img src={modalImage || ''} alt="Enlarged view" style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} />

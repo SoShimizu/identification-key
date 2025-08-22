@@ -483,6 +483,45 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 		}
 	}
 
+	// NEW: Load metadata from the "TaxaMeta" sheet if it exists
+	metaSheetName := "TaxaMeta"
+	if metaSheetRows, err := f.GetRows(metaSheetName); err == nil && len(metaSheetRows) > 1 {
+		log.Printf("[EXCEL PARSER] Found 'TaxaMeta' sheet. Loading details...")
+		header := metaSheetRows[0]
+		colIdxName, colIdxDesc, colIdxRefs, colIdxImages := -1, -1, -1, -1
+		for i, h := range header {
+			cleanHeader := strings.ToLower(cleanString(h))
+			switch cleanHeader {
+			case "#taxonname":
+				colIdxName = i
+			case "#description":
+				colIdxDesc = i
+			case "#references":
+				colIdxRefs = i
+			case "#images":
+				colIdxImages = i
+			}
+		}
+
+		if colIdxName != -1 {
+			for r := 1; r < len(metaSheetRows); r++ {
+				taxonName := cleanString(getRawCell(metaSheetRows, r, colIdxName))
+				if taxonName == "" {
+					continue
+				}
+
+				if idx, ok := taxonIndex[taxonName]; ok {
+					m.Taxa[idx].Description = getRawCell(metaSheetRows, r, colIdxDesc)
+					m.Taxa[idx].References = getRawCell(metaSheetRows, r, colIdxRefs)
+					imageStr := cleanString(getRawCell(metaSheetRows, r, colIdxImages))
+					if imageStr != "" {
+						m.Taxa[idx].Images = regexp.MustCompile(`[ ,;]+`).Split(imageStr, -1)
+					}
+				}
+			}
+		}
+	}
+
 	sum := &LoadSummary{Dir: path, Traits: len(m.Traits), Taxa: len(m.Taxa), FilesParsed: 1}
 	if sum.Traits == 0 || sum.Taxa == 0 {
 		return sum, errors.New("parsed zero traits or taxa")

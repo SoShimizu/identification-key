@@ -100,13 +100,32 @@ func (a *App) GetMatrix() (*engine.Matrix, error) {
 	return a.currentMatrix, nil
 }
 
+// GetTaxonDetails returns all available data for a single taxon.
+func (a *App) GetTaxonDetails(taxonID string) (*engine.Taxon, error) {
+	if a.currentMatrix == nil {
+		return nil, fmt.Errorf("no matrix loaded")
+	}
+	for _, taxon := range a.currentMatrix.Taxa {
+		if taxon.ID == taxonID {
+			return &taxon, nil
+		}
+	}
+	return nil, fmt.Errorf("taxon with ID '%s' not found", taxonID)
+}
+
 // GetHelpImage: ヘルプ画像を読み込んでBase64エンコードされた文字列として返す
 func (a *App) GetHelpImage(filename string) (string, error) {
+	// Try help_materials first, then fall back to keys directory for taxon images
 	imgPath := filepath.Join(a.basePath, "help_materials", filename)
+
+	if _, err := os.Stat(imgPath); os.IsNotExist(err) {
+		// Fallback for taxon images which might be placed alongside keys
+		imgPath = filepath.Join(a.keysDir, filename)
+	}
 
 	data, err := os.ReadFile(imgPath)
 	if err != nil {
-		log.Printf("ERROR: Failed to read help image %s: %v", imgPath, err)
+		log.Printf("ERROR: Failed to read image %s: %v", filename, err)
 		return "", err
 	}
 
@@ -127,19 +146,20 @@ func (a *App) ApplyFiltersAlgoOpt(req ApplyRequest) (*ApplyResultEx, error) {
 	}
 
 	eopts := engine.AlgoOptions{
-		DefaultAlphaFP:    req.Opts.DefaultAlphaFP,
-		DefaultBetaFN:     req.Opts.DefaultBetaFN,
-		GammaNAPenalty:    req.Opts.GammaNAPenalty,
-		WantInfoGain:      req.Opts.WantInfoGain,
-		UsePragmaticScore: req.Opts.UsePragmaticScore,
-		Lambda:            req.Opts.Lambda,
-		A0:                req.Opts.A0,
-		B0:                req.Opts.B0,
-		Kappa:             req.Opts.Kappa,
-		ConflictPenalty:   req.Opts.ConflictPenalty,
-		ToleranceFactor:   req.Opts.ToleranceFactor,
-		CategoricalAlgo:   req.Opts.CategoricalAlgo,
-		JaccardThreshold:  req.Opts.JaccardThreshold,
+		DefaultAlphaFP:         req.Opts.DefaultAlphaFP,
+		DefaultBetaFN:          req.Opts.DefaultBetaFN,
+		GammaNAPenalty:         req.Opts.GammaNAPenalty,
+		WantInfoGain:           req.Opts.WantInfoGain,
+		UsePragmaticScore:      req.Opts.UsePragmaticScore,
+		RecommendationStrategy: req.Opts.RecommendationStrategy, // BUG FIX: Pass strategy to engine
+		Lambda:                 req.Opts.Lambda,
+		A0:                     req.Opts.A0,
+		B0:                     req.Opts.B0,
+		Kappa:                  req.Opts.Kappa,
+		ConflictPenalty:        req.Opts.ConflictPenalty,
+		ToleranceFactor:        req.Opts.ToleranceFactor,
+		CategoricalAlgo:        req.Opts.CategoricalAlgo,
+		JaccardThreshold:       req.Opts.JaccardThreshold,
 	}
 
 	res, err := engine.ApplyFiltersAlgoOpt(

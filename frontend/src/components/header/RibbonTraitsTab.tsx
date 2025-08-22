@@ -29,40 +29,54 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
 
   return (
     <Stack direction={{xs: "column", md: "row"}} spacing={2} alignItems="flex-start">
-        <Card variant="outlined" sx={{ flex: 1, width: '100%' }}>
+        {/* Recommendation Strategy Card */}
+        <Card variant="outlined" sx={{ flex: 1.5, width: '100%' }}>
             <CardHeader avatar={<RecommendIcon color="action" />} title={T.param_recommend.title} titleTypographyProps={{variant: 'h6'}} />
             <CardContent>
+                <FormControl component="fieldset" sx={{width: '100%'}}>
+                    <Typography variant="subtitle2" gutterBottom>{T.recommendation_strategy.name}</Typography>
+                    <RadioGroup row value={opts.recommendationStrategy} onChange={handleRadio("recommendationStrategy")}>
+                        <FormControlLabel value="max_ig" control={<Radio size="small" />} label={T.recommendation_strategy.options.breakthrough} />
+                        <FormControlLabel value="expected_ig" control={<Radio size="small" />} label={T.recommendation_strategy.options.stable} />
+                    </RadioGroup>
+                     <Box sx={{ p: 1.5, my: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{mb: 1}}>
+                            {opts.recommendationStrategy === 'expected_ig' ? T.recommendation_strategy.description.stable : T.recommendation_strategy.description.breakthrough}
+                        </Typography>
+                        <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, borderBottom: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '0.75rem' }}}>
+                           <TableHead>
+                                <TableRow>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.recommendation_strategy.table_header_strategy}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.recommendation_strategy.table_header_merit}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.recommendation_strategy.table_header_demerit}</Typography></TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {T.recommendation_strategy.tradeoffs.map(item => (
+                                    <TableRow key={item.setting}>
+                                        <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
+                                        <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
+                                        <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                     </Box>
+                </FormControl>
+                <Divider sx={{ my: 1.5 }} />
                 <FormControlLabel
                     control={<Switch checked={opts.usePragmaticScore} onChange={handleBool("usePragmaticScore")} />}
                     label={<Typography variant="subtitle2">{T.pragmatic_score.name}</Typography>}
                 />
-                <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
-                        {T.pragmatic_score.description}{'\n\n'}
-                        <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.pragmatic_score.effect}
+                 <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover', fontSize: '0.75rem' }}>
+                    <Typography variant="caption" color="text.secondary" component="p">
+                        {T.pragmatic_score.description}
                     </Typography>
-                     <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' }}}>
-                         <TableHead>
-                            <TableRow>
-                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_setting}</Typography></TableCell>
-                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_merit}</Typography></TableCell>
-                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_demerit}</Typography></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {T.pragmatic_score.tradeoffs.map(item => (
-                                <TableRow key={item.setting}>
-                                    <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
-                                    <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
                 </Box>
             </CardContent>
         </Card>
 
+        {/* Continuous Traits Card */}
         <Card variant="outlined" sx={{ flex: 1, width: '100%' }}>
             <CardHeader avatar={<StraightenIcon color="action" />} title={T.param_continuous.title} titleTypographyProps={{variant: 'h6'}}/>
             <CardContent>
@@ -81,33 +95,15 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                     </Stack>
                  </Box>
                  <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
-                        {T.param_tolerance.description}{'\n\n'}
-                        <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.param_tolerance.effect}
+                    <Typography variant="caption" color="text.secondary" display="block">
+                        {T.param_tolerance.description}
                     </Typography>
-                    <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' }}}>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_setting}</Typography></TableCell>
-                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_merit}</Typography></TableCell>
-                                <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_demerit}</Typography></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {T.param_tolerance.tradeoffs.map(item => (
-                                <TableRow key={item.setting}>
-                                    <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
-                                    <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
                  </Box>
             </CardContent>
         </Card>
 
-        <Card variant="outlined" sx={{ flex: 1.5, width: '100%' }}>
+        {/* Multi-Select Traits Card */}
+        <Card variant="outlined" sx={{ flex: 1, width: '100%' }}>
             <CardHeader avatar={<HubIcon color="action" />} title={T.param_multi.title} titleTypographyProps={{variant: 'h6'}}/>
             <CardContent>
                 <FormControl>
@@ -116,26 +112,6 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                         <FormControlLabel value="binary" control={<Radio size="small" />} label="Binary" />
                         <FormControlLabel value="jaccard" control={<Radio size="small" />} label="Jaccard" />
                     </RadioGroup>
-                     <Box sx={{ p: 1.5, my: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                        <Table size="small" sx={{ '.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' } }}>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.categorical_algo.table_header_algorithm}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.categorical_algo.table_header_use_case}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.categorical_algo.table_header_pros_cons}</Typography></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {T.categorical_algo.algorithms.map(item => (
-                                    <TableRow key={item.name}>
-                                        <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.name}</strong></Typography></TableCell>
-                                        <TableCell><Typography variant="caption" color="text.secondary">{item.use_case}</Typography></TableCell>
-                                        <TableCell><Typography variant="caption" color="text.secondary">{item.pros_cons}</Typography></TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                     </Box>
                 </FormControl>
                 <Divider sx={{ my: 1.5 }} />
                 <Box sx={{opacity: opts.categoricalAlgo === 'jaccard' ? 1 : 0.5}}>
@@ -153,28 +129,9 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                         </Stack>
                     </Box>
                     <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
-                            {T.jaccard_threshold.description}{'\n\n'}
-                            <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.jaccard_threshold.effect}
+                        <Typography variant="caption" color="text.secondary" display="block">
+                            {T.jaccard_threshold.description}
                         </Typography>
-                         <Table size="small" sx={{'.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' }}}>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_setting}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_merit}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{STR[lang].candidatesTab.table_header_demerit}</Typography></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {T.jaccard_threshold.tradeoffs.map(item => (
-                                    <TableRow key={item.setting}>
-                                        <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.setting}</strong></Typography></TableCell>
-                                        <TableCell><Typography variant="caption" color="text.secondary">{item.pro}</Typography></TableCell>
-                                        <TableCell><Typography variant="caption" color="text.secondary">{item.con}</Typography></TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
                     </Box>
                 </Box>
             </CardContent>

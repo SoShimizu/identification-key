@@ -7,10 +7,11 @@ import {
 } from "@mui/material";
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import { STR } from "../../../i18n";
+import { Taxon } from "../../../api";
 
 export type EngineScore = {
   rank?: number;
-  taxon: { id?: string; name: string };
+  taxon: Taxon; // Use the full Taxon object
   post?: number;
   delta?: number;
   used?: number;
@@ -34,7 +35,7 @@ const ScoreCell = ({ score }: { score: number }) => (
 
 export default function CandidatesPanel({
   title, rows, totalTaxa, lang = "ja", algo,
-  comparisonList, setComparisonList, onCompareClick,
+  comparisonList, setComparisonList, onCompareClick, onTaxonSelect
 }: {
   title?: string;
   rows: EngineScore[];
@@ -44,6 +45,7 @@ export default function CandidatesPanel({
   comparisonList: string[];
   setComparisonList: React.Dispatch<React.SetStateAction<string[]>>;
   onCompareClick: () => void;
+  onTaxonSelect: (taxon: Taxon) => void;
 }) {
   const T = STR[lang].candidatesPanel;
   const [showMatchSupport, setShowMatchSupport] = useState<boolean>(false);
@@ -100,12 +102,14 @@ export default function CandidatesPanel({
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
-                <Checkbox
-                    indeterminate={numSelected > 0 && numSelected < rowCount}
-                    checked={isAllSelected}
-                    onChange={handleSelectAllClick}
-                    inputProps={{ 'aria-label': 'select all candidates' }}
-                />
+                <Tooltip title={isAllSelected ? "Deselect All" : "Select All"}>
+                  <Checkbox
+                      indeterminate={numSelected > 0 && numSelected < rowCount}
+                      checked={isAllSelected}
+                      onChange={handleSelectAllClick}
+                      inputProps={{ 'aria-label': 'select all candidates' }}
+                  />
+                </Tooltip>
               </TableCell>
               <TableCell sx={{ width: 50 }}>{T.header_rank}</TableCell>
               <TableCell>{T.header_name}</TableCell>
@@ -123,13 +127,16 @@ export default function CandidatesPanel({
               <TableRow
                 key={taxonId || `${i}-${r.taxon?.name}`}
                 hover
-                sx={{ bgcolor: (r.conflicts ?? 0) > 0 ? 'rgba(255, 170, 170, 0.1)' : 'transparent' }}
+                onClick={() => onTaxonSelect(r.taxon)}
+                sx={{ 
+                  cursor: 'pointer',
+                  bgcolor: (r.conflicts ?? 0) > 0 ? 'rgba(255, 170, 170, 0.1)' : 'transparent' 
+                }}
               >
-                <TableCell padding="checkbox">
+                <TableCell padding="checkbox" onClick={(e) => { e.stopPropagation(); handleCompareChange(taxonId, !isChecked); }}>
                     <Checkbox
                         size="small"
                         checked={isChecked}
-                        onChange={(e) => handleCompareChange(taxonId, e.target.checked)}
                         disabled={!taxonId}
                     />
                 </TableCell>

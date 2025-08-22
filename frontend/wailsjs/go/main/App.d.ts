@@ -14,6 +14,8 @@ export function GetHelpImage(arg1:string):Promise<string>;
 
 export function GetMatrix():Promise<engine.Matrix>;
 
+export function GetTaxonDetails(arg1:string):Promise<engine.Taxon>;
+
 export function ListMyKeys():Promise<Array<main.KeyInfo>>;
 
 export function PickKey(arg1:string):Promise<void>;

@@ -1,9 +1,8 @@
 // frontend/src/components/panels/traits/TraitsTabsPanel.tsx
 import React, { useState } from 'react';
-import { Box, Tab, Tabs, ButtonGroup, Button, Stack, FormControlLabel, Switch, Typography, Divider } from '@mui/material';
+import { Box, Tab, Tabs, ButtonGroup, Button, Stack, Divider } from '@mui/material';
 import TraitsPanel, { TraitRow } from './TraitsPanel';
-import HelpDisplay from './HelpDisplay';
-import { Trait, TraitSuggestion, MultiChoice } from '../../../api'; // Import MultiChoice
+import { Trait, TraitSuggestion, MultiChoice } from '../../../api';
 import { AlgoOptions } from '../../../hooks/useAlgoOpts';
 import { STR } from '../../../i18n';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -12,10 +11,11 @@ type Props = {
     lang: "ja" | "en";
     rows: TraitRow[];
     selected: Record<string, number>;
-    selectedMulti: Record<string, MultiChoice>; // Add this line
-    setBinary: (traitId: string, val: number, label: string) => void;
+    selectedMulti: Record<string, MultiChoice>;
+    setBinary: (traitId: string, val: number | null, label: string) => void;
     setContinuous: (traitId: string, val: number | null, label: string) => void;
-    setMulti: (traitId: string, values: MultiChoice, label: string) => void; // Add this line
+    setMulti: (traitId: string, values: MultiChoice, label: string) => void;
+    setMultiAsNA: (traitId: string, label?: string) => void; // Add this line
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
     clearAllSelections: () => void;
@@ -25,20 +25,15 @@ type Props = {
     suggRank?: Record<string, number>;
     opts: AlgoOptions;
     setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>;
+    onTraitSelect: (trait?: Trait) => void;
 };
 
 export default function TraitsTabsPanel(props: Props) {
-    const { lang, sortBy, setSortBy, opts, setOpts, selected, clearAllSelections } = props;
+    const { lang, sortBy, setSortBy, selected, clearAllSelections } = props;
     const [activeTab, setActiveTab] = useState<"unselected" | "selected">("unselected");
-    const [activeTrait, setActiveTrait] = useState<Trait | undefined>(undefined);
     const T = STR[lang].traitsPanel;
 
-    const handleTraitSelect = (trait?: Trait) => {
-        setActiveTrait(trait);
-    };
-
     const hasSelections = Object.keys(selected).length > 0 || Object.values(props.selectedMulti).some(v => v.length > 0);
-
 
     return (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -66,18 +61,12 @@ export default function TraitsTabsPanel(props: Props) {
                     </Button>
                 </Stack>
             </Stack>
-
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, p: 2, gap: 2, minHeight: 0 }}>
-                <Box sx={{ flex: { md: 8 }, height: '100%', minHeight: 0 }}>
-                    <Box sx={{ display: activeTab === 'unselected' ? 'block' : 'none', height: '100%' }}>
-                        <TraitsPanel {...props} mode="unselected" onTraitSelect={handleTraitSelect} />
-                    </Box>
-                    <Box sx={{ display: activeTab === 'selected' ? 'block' : 'none', height: '100%' }}>
-                        <TraitsPanel {...props} mode="selected" onTraitSelect={handleTraitSelect} />
-                    </Box>
+            <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
+                <Box sx={{ display: activeTab === 'unselected' ? 'block' : 'none', height: '100%' }}>
+                    <TraitsPanel {...props} mode="unselected" />
                 </Box>
-                <Box sx={{ flex: { md: 4 }, height: '100%' }}>
-                    <HelpDisplay trait={activeTrait} lang={lang} />
+                <Box sx={{ display: activeTab === 'selected' ? 'block' : 'none', height: '100%' }}>
+                    <TraitsPanel {...props} mode="selected" />
                 </Box>
             </Box>
         </Box>

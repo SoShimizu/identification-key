@@ -1,6 +1,6 @@
 // frontend/src/api.ts
 import { engine, main } from "../wailsjs/go/models";
-import { GetMatrix } from "../wailsjs/go/main/App";
+import { GetMatrix, GetTaxonDetails } from "../wailsjs/go/main/App"; // Import GetTaxonDetails
 
 // For binary traits, -1, 0, 1. For continuous, the float value.
 // For categorical multi, it's a bitmask or similar, but we'll use a string array for the selection state.
@@ -25,7 +25,12 @@ export type Trait = {
   states?: string[]; // For categorical_multi
 };
 
-export type Taxon = engine.Taxon;
+// Extend Taxon type to include new fields
+export type Taxon = engine.Taxon & {
+    description?: string;
+    references?: string;
+    images?: string[];
+};
 
 export type Matrix = {
   name: string;
@@ -44,4 +49,15 @@ export type ApplyResult = main.ApplyResultEx;
 export async function getMatrix(): Promise<Matrix> {
   const m = await GetMatrix();
   return m as unknown as Matrix;
+}
+
+// New function to get taxon details
+export async function getTaxonDetails(taxonId: string): Promise<Taxon | null> {
+    try {
+        const taxon = await GetTaxonDetails(taxonId);
+        return taxon as unknown as Taxon;
+    } catch (error) {
+        console.error(`Failed to get details for taxon ${taxonId}:`, error);
+        return null;
+    }
 }

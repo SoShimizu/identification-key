@@ -24,9 +24,10 @@ type UseMatrixReturn = {
     taxaCount: number;
     selected: Record<string, Choice>;
     selectedMulti: Record<string, MultiChoice>; 
-    setBinary: (traitId: string, val: Choice, label?: string) => void;
+    setBinary: (traitId: string, val: Choice | null, label?: string) => void;
     setContinuous: (traitId: string, val: number | null, label?: string) => void;
     setMulti: (traitId: string, values: MultiChoice, label?: string) => void; 
+    setMultiAsNA: (traitId: string, label?: string) => void; // New handler for NA
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel?: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
     clearAllSelections: () => void;
@@ -52,45 +53,26 @@ type UseMatrixReturn = {
 
 
 export function useMatrix(): UseMatrixReturn {
-  // MyKeys
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
-
-  // Matrix
   const [matrixName, setMatrixName] = useState<string>("");
   const [traits, setTraits] = useState<Trait[]>([]);
   const [taxaCount, setTaxaCount] = useState<number>(0);
-
-  // selection
   const [selected, setSelected] = useState<Record<string, Choice>>({});
-  const [selectedMulti, setSelectedMulti] = useState<Record<string, MultiChoice>>({}); // New state
-
-  // mode/algo from UI settings
+  const [selectedMulti, setSelectedMulti] = useState<Record<string, MultiChoice>>({});
   const { opts, setOpts } = useAlgoOpts(matrixName);
   const [algo, setAlgo] = useState<"bayes" | "heuristic">("bayes");
-
   const mode = useMemo(() => (opts.conflictPenalty > 0.5 ? "strict" : "lenient"), [opts.conflictPenalty]);
-
-  const setMode = useCallback((newMode: "strict" | "lenient") => {
-      setOpts(prevOpts => ({
-          ...prevOpts,
-          conflictPenalty: newMode === 'strict' ? 1.0 : 0.0,
-      }));
-  }, [setOpts]);
-
-
-  // results
   const [scores, setScores] = useState<TaxonScore[]>([]);
   const [suggs, setSuggs] = useState<TraitSuggestion[]>([]);
-
-  // display settings
   const [suggAlgo, setSuggAlgo] = useState<"gini" | "entropy">("gini");
   const [sortBy, setSortBy] = useState<"recommend" | "group" | "name">("recommend");
-
-  // history
   const [history, setHistory] = useState<{ t: number; text: string; gain?: number }[]>([]);
 
-  // === MyKeys ===
+  const setMode = useCallback((newMode: "strict" | "lenient") => {
+      setOpts(prevOpts => ({ ...prevOpts, conflictPenalty: newMode === 'strict' ? 1.0 : 0.0 }));
+  }, [setOpts]);
+
   const refreshKeys = useCallback(async () => {
     try {
         await EnsureMyKeysAndSamples();
@@ -99,9 +81,7 @@ export function useMatrix(): UseMatrixReturn {
         const cur = await GetCurrentKeyName().catch(() => "");
         const found = list.find((k) => k.name === cur);
         setActiveKey(found ? found.name : list[0]?.name ?? undefined);
-    } catch (error) {
-        console.error("Failed to refresh keys:", error);
-    }
+    } catch (error) { console.error("Failed to refresh keys:", error); }
   }, []);
 
   const pickKey = useCallback(async (name: string) => {
@@ -109,14 +89,11 @@ export function useMatrix(): UseMatrixReturn {
         setActiveKey(name);
         await PickKey(name);
         setSelected({});
-        setSelectedMulti({}); // Reset multi-selection as well
+        setSelectedMulti({});
         setHistory([]);
-    } catch (error) {
-        console.error(`Failed to pick key "${name}":`, error);
-    }
+    } catch (error) { console.error(`Failed to pick key "${name}":`, error); }
   }, []);
 
-  // === Matrix Loading ===
   const loadMatrix = useCallback(async () => {
     try {
       const m: Matrix = await (window as any).go.main.App.GetMatrix();
@@ -138,31 +115,28 @@ export function useMatrix(): UseMatrixReturn {
     return () => { if (unsubscribe) unsubscribe(); };
   }, [loadMatrix, refreshKeys]);
 
-  // === Evaluation (debounced) ===
   const runEval = useCallback(async () => {
     try {
         const res = await applyFilters(selected, selectedMulti, mode, algo, { ...opts, wantInfoGain: true });
         setScores(res.scores || []);
         setSuggs(res.suggestions || []);
-    } catch (error) {
-        console.error("Failed to run evaluation:", error);
-    }
+    } catch (error) { console.error("Failed to run evaluation:", error); }
   }, [selected, selectedMulti, mode, algo, opts]);
-
 
   const runEvalDebounced = useDebouncedCallback(runEval, 120);
   useEffect(() => { runEvalDebounced(); }, [runEvalDebounced]);
 
-  // === Selection Handlers ===
-  const setBinary = useCallback((traitId: string, val: Choice, label?: string) => {
+  const setBinary = useCallback((traitId: string, val: Choice | null, label?: string) => {
     setSelected((prev) => {
       const next = { ...prev };
-      if (val === 0) {
+      if (val === null) {
           delete next[traitId];
+          setHistory((h) => [{ t: Date.now(), text: `Clear ${label || traitId}` }, ...h].slice(0, 200));
       } else {
           next[traitId] = val;
+          const valText = val === 0 ? "NA" : val === 1 ? "Yes" : "No";
+          setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => ${valText}` }, ...h].slice(0, 200));
       }
-      setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => ${val}` }, ...h].slice(0, 200));
       return next;
     });
   }, []);
@@ -181,18 +155,37 @@ export function useMatrix(): UseMatrixReturn {
     });
   }, []);
 
-  // New setter for multi-categorical traits
   const setMulti = useCallback((traitId: string, values: MultiChoice, label?: string) => {
+    setSelected(prev => {
+        const next = {...prev};
+        delete next[traitId]; // Clear any NA state for this trait
+        return next;
+    });
     setSelectedMulti(prev => {
         const next = {...prev};
         if(values.length === 0) {
             delete next[traitId];
+            setHistory((h) => [{ t: Date.now(), text: `Clear ${label || traitId}` }, ...h].slice(0, 200));
         } else {
             next[traitId] = values;
+            setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => [${values.join(', ')}]` }, ...h].slice(0, 200));
         }
-        setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => [${values.join(', ')}]` }, ...h].slice(0, 200));
         return next;
-    })
+    });
+  }, []);
+  
+  const setMultiAsNA = useCallback((traitId: string, label?: string) => {
+      setSelectedMulti(prev => {
+          const next = {...prev};
+          delete next[traitId]; // Clear any selected states
+          return next;
+      });
+      setSelected(prev => {
+          const next = {...prev};
+          next[traitId] = 0; // Set NA state
+          return next;
+      });
+      setHistory((h) => [{ t: Date.now(), text: `Set ${label || traitId} => NA` }, ...h].slice(0, 200));
   }, []);
 
   const setDerivedPick = useCallback((childrenIds: string[], chosenId: string, parentLabel?: string) => {
@@ -207,7 +200,13 @@ export function useMatrix(): UseMatrixReturn {
   const clearDerived = useCallback((childrenIds: string[], parentLabel?: string, asNA?: boolean) => {
     setSelected((prev) => {
       const next = { ...prev };
-      for (const cid of childrenIds) delete next[cid];
+      for (const cid of childrenIds) {
+          if (asNA) {
+              next[cid] = 0;
+          } else {
+              delete next[cid];
+          }
+      }
       setHistory((h) => [{ t: Date.now(), text: `${asNA ? "Set NA" : "Clear"} ${parentLabel || "(derived)"}` }, ...h].slice(0, 200));
       return next;
     });
@@ -219,13 +218,10 @@ export function useMatrix(): UseMatrixReturn {
     setHistory([]);
   }, []);
 
-  // === Memoized derived state ===
   const suggMap: Record<string, TraitSuggestion> = useMemo(() => {
     const m: Record<string, TraitSuggestion> = {};
     for (const s of suggs || []) {
-      if (s.traitId) {
-        m[s.traitId] = s;
-      }
+      if (s.traitId) m[s.traitId] = s;
     }
     return m;
   }, [suggs]);
@@ -236,14 +232,11 @@ export function useMatrix(): UseMatrixReturn {
         const otherTraits: Trait[] = [];
 
         for (const t of traits) {
-            if (t.type === 'nominal_parent') {
-                parents[t.name] = t;
-            } else if (t.type === 'derived' && t.parent) {
+            if (t.type === 'nominal_parent') parents[t.name] = t;
+            else if (t.type === 'derived' && t.parent) {
                 if (!byParent[t.parent]) byParent[t.parent] = [];
                 byParent[t.parent].push(t);
-            } else {
-                otherTraits.push(t);
-            }
+            } else otherTraits.push(t);
         }
 
         const out: TraitRow[] = [];
@@ -261,20 +254,16 @@ export function useMatrix(): UseMatrixReturn {
         }
 
         for (const t of otherTraits) {
-            if (t.type === 'binary') {
-                out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
-            } else if (t.type === 'continuous') {
-                out.push({ group: t.group || "", traitName: t.name, type: "continuous", continuous: { ...t } });
-            } else if (t.type === 'categorical_multi') {
-                out.push({ group: t.group || "", traitName: t.name, type: "categorical_multi", multi: { ...t } });
-            }
+            if (t.type === 'binary') out.push({ group: t.group || "", traitName: t.name, type: "binary", binary: { ...t } });
+            else if (t.type === 'continuous') out.push({ group: t.group || "", traitName: t.name, type: "continuous", continuous: { ...t } });
+            else if (t.type === 'categorical_multi') out.push({ group: t.group || "", traitName: t.name, type: "categorical_multi", multi: { ...t } });
         }
         return out;
     }, [traits]);
 
   return {
     rows, traits, matrixName, taxaCount,
-    selected, selectedMulti, setBinary, setContinuous, setMulti, setDerivedPick, clearDerived, clearAllSelections,
+    selected, selectedMulti, setBinary, setContinuous, setMulti, setMultiAsNA, setDerivedPick, clearDerived, clearAllSelections,
     mode, setMode, algo, setAlgo, opts, setOpts,
     scores, suggs, suggMap, sortBy, setSortBy, suggAlgo, setSuggAlgo,
     pickKey, keys, activeKey, refreshKeys,

@@ -113,6 +113,24 @@ export const STR = {
         param_recommend: {
             title: "形質推薦のスコア計算",
         },
+        recommendation_strategy: {
+            name: "推薦戦略 (既定値: 一点突破)",
+            options: {
+                stable: "安定進行（初心者向け）",
+                breakthrough: "一点突破（専門家向け）",
+            },
+            description: {
+                stable: "どの状態を観察しても、平均的・安定的に候補を絞れる形質を優先して推薦します。",
+                breakthrough: "稀な状態を観察できれば一気に同定が進むような、ハイリスク・ハイリターンな「キラー形質」を優先して推薦します。",
+            },
+            table_header_strategy: "戦略",
+            table_header_merit: "メリット",
+            table_header_demerit: "デメリット",
+            tradeoffs: [
+              { setting: "一点突破", pro: "専門家が仮説を検証する際に、決定的形質を素早く見つけられる", con: "ほとんどの場合で情報量の少ない形質が上位に来る可能性がある" },
+              { setting: "安定進行", pro: "初心者でも迷いにくく、着実に同定を進められる", con: "一発逆転の「キラー形質」が見逃されやすい" },
+            ]
+        },
         pragmatic_score: {
             name: "実用性スコアを有効化 (既定値: 有効)",
             description: "有効にすると、単なる情報量だけでなく、「観察のしやすさ(コスト)」と「見間違いにくさ(リスク)」を考慮して次に調べるべき形質を推薦します。",
@@ -276,6 +294,24 @@ export const STR = {
     traitsTab: {
         param_recommend: {
             title: "Trait Recommendation Scoring",
+        },
+        recommendation_strategy: {
+            name: "Recommendation Strategy (Default: Breakthrough)",
+            options: {
+                stable: "Stable Progress (for Beginners)",
+                breakthrough: "Breakthrough (for Experts)",
+            },
+            description: {
+                stable: "Recommends traits that, on average, are most effective at narrowing down candidates, regardless of the observed state.",
+                breakthrough: "Prioritizes high-risk, high-reward 'killer traits' that can lead to a definitive identification if a specific rare state is observed.",
+            },
+            table_header_strategy: "Strategy",
+            table_header_merit: "Merit",
+            table_header_demerit: "Demerit",
+            tradeoffs: [
+              { setting: "Breakthrough", pro: "Allows experts to quickly test hypotheses with decisive traits.", con: "May recommend traits that are uninformative in most cases." },
+              { setting: "Stable Progress", pro: "Easy for beginners to follow a steady path to identification.", con: "May overlook 'killer traits' that could provide a shortcut." }
+            ]
         },
         pragmatic_score: {
             name: "Enable Pragmatic Score (Default: Enabled)",

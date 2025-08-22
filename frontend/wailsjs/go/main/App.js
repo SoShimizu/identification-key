@@ -22,6 +22,10 @@ export function GetMatrix() {
   return window['go']['main']['App']['GetMatrix']();
 }
 
+export function GetTaxonDetails(arg1) {
+  return window['go']['main']['App']['GetTaxonDetails'](arg1);
+}
+
 export function ListMyKeys() {
   return window['go']['main']['App']['ListMyKeys']();
 }

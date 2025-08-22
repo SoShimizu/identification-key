@@ -3,14 +3,14 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Paper, Box, Typography, Stack, Button, ButtonGroup, Chip, Table, TableHead,
   TableRow, TableCell, TableContainer, Tooltip,
-  TableBody, Slider, TextField, IconButton, FormGroup, FormControlLabel, Checkbox, Popover
+  TableBody, Slider, TextField, IconButton
 } from "@mui/material";
 import DescriptionIcon from '@mui/icons-material/Description';
 import ImageIcon from '@mui/icons-material/Image';
 import ClearIcon from '@mui/icons-material/Clear';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { STR } from "../../../i18n";
-import { Trait, TraitSuggestion, MultiChoice } from "../../../api";
+import { Trait, TraitSuggestion, MultiChoice, Choice } from "../../../api";
 
 
 export type TraitRow =
@@ -22,11 +22,12 @@ export type TraitRow =
 type Props = {
   mode: "unselected" | "selected";
   rows: TraitRow[];
-  selected: Record<string, number>;
+  selected: Record<string, Choice>;
   selectedMulti: Record<string, MultiChoice>;
-  setBinary: (traitId: string, val: number, label: string) => void;
+  setBinary: (traitId: string, val: Choice | null, label: string) => void;
   setContinuous: (traitId: string, val: number | null, label: string) => void;
   setMulti: (traitId: string, values: MultiChoice, label: string) => void;
+  setMultiAsNA: (traitId: string, label?: string) => void; // BUG FIX: Add prop to type
   setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
   clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
   sortBy: "recommend" | "group" | "name";
@@ -45,9 +46,12 @@ function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion
 
 const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) => {
     if (!suggestion || !(suggestion.score > 0)) return null;
-    const normalizedScore = suggestion.ig > 0 ? (suggestion.score / suggestion.ig) : 0;
+    const baseScore = suggestion.score;
+    const ig = suggestion.ig > 0 ? suggestion.ig : 1; // Avoid division by zero
+    const normalizedScore = Math.max(0, baseScore / ig);
     const w = Math.max(2, Math.min(100, Math.round(normalizedScore * 100)));
-    const tooltipTitle = `Score: ${suggestion.score.toFixed(3)} (IG: ${suggestion.ig?.toFixed(3) ?? 'N/A'} / Difficulty: ${suggestion.difficulty?.toFixed(1) ?? 'N/A'} * RiskFactor: ${(1 - (suggestion.risk ?? 0)).toFixed(2)})`;
+    const tooltipTitle = `Score: ${suggestion.score.toFixed(3)} (IG: ${suggestion.ig?.toFixed(3) ?? 'N/A'} / MaxIG: ${suggestion.max_ig?.toFixed(3) ?? 'N/A'})`;
+
 
     return (
       <Tooltip title={tooltipTitle}>
@@ -90,79 +94,74 @@ const ContinuousInput = ({ trait, selectedValue, onApply }: { trait: Trait, sele
     );
 };
 
-// New component for multi-categorical traits
-const MultiChoiceInput = ({ trait, selectedValues, onApply, lang = "ja" }: { trait: Trait, selectedValues: MultiChoice, onApply: (values: MultiChoice) => void, lang?: "ja" | "en" }) => {
-    const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
-    const [localSelection, setLocalSelection] = useState<MultiChoice>(selectedValues);
+const MultiChoiceInlineInput = ({ trait, selectedValues, isNA, onApply, onSetNA, onClear, lang = "ja" }: {
+    trait: Trait,
+    selectedValues: MultiChoice,
+    isNA: boolean,
+    onApply: (values: MultiChoice) => void,
+    onSetNA: () => void,
+    onClear: () => void,
+    lang?: "ja" | "en"
+}) => {
     const T = STR[lang].traitsPanel;
+    const [localSelection, setLocalSelection] = useState<MultiChoice>(selectedValues);
 
     useEffect(() => {
         setLocalSelection(selectedValues);
     }, [selectedValues]);
 
-    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-        setLocalSelection(selectedValues); // Open popover with the current global state
-        setAnchorEl(event.currentTarget);
-    };
-    const handleClose = () => setAnchorEl(null);
-
-    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, checked } = event.target;
-        const newValues = checked ? [...localSelection, name] : localSelection.filter(v => v !== name);
-        setLocalSelection(newValues);
-    };
-
-    const handleApply = () => {
-        onApply(localSelection);
-        handleClose();
+    const handleToggle = (state: string) => {
+        const newSelection = localSelection.includes(state)
+            ? localSelection.filter(s => s !== state)
+            : [...localSelection, state];
+        setLocalSelection(newSelection);
     };
     
-    const handleClear = () => {
-        setLocalSelection([]);
-        onApply([]);
-        handleClose();
-    }
-
-    const open = Boolean(anchorEl);
-    const id = open ? `popover-${trait.id}` : undefined;
+    const handleApply = () => onApply(localSelection);
 
     return (
-        <Box onClick={(e) => e.stopPropagation()}>
-            <Tooltip title={T.multi_select_tooltip}>
-                <Button aria-describedby={id} variant="outlined" size="small" onClick={handleClick}>
-                    {selectedValues.length > 0 ? `${selectedValues.length} selected` : "Select States"}
+        <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+            {(trait.states || []).map(state => (
+                <Button
+                    key={state}
+                    size="small"
+                    variant={localSelection.includes(state) ? 'contained' : 'outlined'}
+                    onClick={() => handleToggle(state)}
+                    disabled={isNA}
+                >
+                    {state}
                 </Button>
+            ))}
+            <Tooltip title={T.apply_selection}>
+                <span>
+                    <IconButton size="small" color="primary" onClick={handleApply} disabled={isNA}>
+                        <CheckCircleOutlineIcon />
+                    </IconButton>
+                </span>
             </Tooltip>
-            <Popover id={id} open={open} anchorEl={anchorEl} onClose={handleClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
-                <Paper sx={{ p: 2, maxHeight: 400, overflowY: 'auto', minWidth: 200 }}>
-                    <Typography variant="caption" color="text.secondary" display="block" mb={1}>{T.multi_select_tooltip}</Typography>
-                    <FormGroup>
-                        {(trait.states || []).map(state => (
-                            <FormControlLabel
-                                key={state}
-                                control={<Checkbox size="small" checked={localSelection.includes(state)} onChange={handleChange} name={state} />}
-                                label={<Typography variant="body2">{state}</Typography>}
-                            />
-                        ))}
-                    </FormGroup>
-                    <Stack direction="row" spacing={1} mt={2}>
-                        <Button size="small" variant="outlined" onClick={handleClear}>{T.state_clear}</Button>
-                        <Button size="small" variant="contained" onClick={handleApply}>{T.apply_selection}</Button>
-                    </Stack>
-                </Paper>
-            </Popover>
-        </Box>
+            <Tooltip title={T.tooltip_na}>
+                <Button size="small" variant={isNA ? 'contained' : 'outlined'} onClick={onSetNA}>{T.state_na}</Button>
+            </Tooltip>
+            <Tooltip title={T.tooltip_clear}>
+                 <span>
+                    <IconButton size="small" onClick={onClear} disabled={selectedValues.length === 0 && !isNA}>
+                        <ClearIcon />
+                    </IconButton>
+                </span>
+            </Tooltip>
+        </Stack>
     );
 };
 
 
-const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setContinuous, setMulti, setDerivedPick, clearDerived, rank, suggestion, onTraitSelect, lang = "ja" }: {
+const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setContinuous, setMulti, setMultiAsNA, setDerivedPick, clearDerived, rank, suggestion, onTraitSelect, lang = "ja" }: {
   r: TraitRow;
   selected: Record<string, number>;
   selectedMulti: Record<string, MultiChoice>;
   setBinary: Props["setBinary"];
   setContinuous: Props["setContinuous"];
   setMulti: Props["setMulti"];
+  setMultiAsNA: Props["setMultiAsNA"];
   setDerivedPick: Props["setDerivedPick"];
   clearDerived: Props["clearDerived"];
   rank?: number;
@@ -189,17 +188,26 @@ const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setCont
              <ButtonGroup variant="outlined" size="small" onClick={(e) => e.stopPropagation()}>
                 <Button variant={selected[r.binary.id] === 1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 1, r.traitName)}>{T.state_yes}</Button>
                 <Button variant={selected[r.binary.id] === -1 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, -1, r.traitName)}>{T.state_no}</Button>
-                <Tooltip title={T.tooltip_na}><Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.state_na}</Button></Tooltip>
-                <Tooltip title={T.tooltip_clear}><Button onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.state_clear}</Button></Tooltip>
+                <Tooltip title={T.tooltip_na}><Button variant={selected[r.binary.id] === 0 ? 'contained' : 'outlined'} onClick={() => setBinary(r.binary.id, 0, r.traitName)}>{T.state_na}</Button></Tooltip>
+                <Tooltip title={T.tooltip_clear}><Button onClick={() => setBinary(r.binary.id, null, r.traitName)}>{T.state_clear}</Button></Tooltip>
             </ButtonGroup>
         ) : r.type === "continuous" ? (
             <ContinuousInput trait={r.continuous} selectedValue={selected[r.continuous.id]} onApply={(val) => setContinuous(r.continuous.id, val, r.traitName)} />
         ) : r.type === "categorical_multi" ? (
-            <MultiChoiceInput trait={r.multi} selectedValues={selectedMulti[r.multi.id] || []} onApply={(values) => setMulti(r.multi.id, values, r.traitName)} lang={lang} />
+            <MultiChoiceInlineInput
+                trait={r.multi}
+                selectedValues={selectedMulti[r.multi.id] || []}
+                isNA={selected[r.multi.id] === 0}
+                onApply={(values) => setMulti(r.multi.id, values, r.traitName)}
+                onSetNA={() => setMultiAsNA(r.multi.id, r.traitName)}
+                onClear={() => setMulti(r.multi.id, [], r.traitName)}
+                lang={lang}
+            />
         ) : ( // derived
             <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
                 {r.children.map(c => (<Button key={c.id} size="small" variant={chosenId === c.id ? 'contained' : 'outlined'} onClick={() => setDerivedPick(r.children.map(x => x.id), c.id, r.traitName)}>{c.label}</Button>))}
-                <Button size="small" variant="outlined" onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>{T.state_clear}</Button>
+                <Tooltip title={T.tooltip_na}><Button size="small" variant={r.children.some(c => selected[c.id] === 0) ? 'contained' : 'outlined'} onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, true)}>{T.state_na}</Button></Tooltip>
+                <Tooltip title={T.tooltip_clear}><Button size="small" variant="outlined" onClick={() => clearDerived(r.children.map(x => x.id), r.traitName, false)}>{T.state_clear}</Button></Tooltip>
             </Stack>
         )}
       </TableCell>
@@ -209,14 +217,18 @@ const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setCont
 
 // TraitsPanel本体
 export default function TraitsPanel(props: Props) {
-  const { mode, rows, selected, selectedMulti, setBinary, setContinuous, setMulti, setDerivedPick, clearDerived, sortBy, suggMap, onTraitSelect, lang = "ja" } = props;
+  const { mode, rows, selected, selectedMulti, sortBy, suggMap } = props;
 
   const filteredAndSortedRows = useMemo(() => {
     const filtered = rows.filter(r => {
-        if (r.type === 'binary') return mode === 'selected' ? (selected[r.binary.id] !== undefined && selected[r.binary.id] !== 0) : (selected[r.binary.id] === undefined || selected[r.binary.id] === 0);
+        if (r.type === 'binary') return mode === 'selected' ? selected[r.binary.id] !== undefined : selected[r.binary.id] === undefined;
         if (r.type === 'continuous') return mode === 'selected' ? selected[r.continuous.id] !== undefined : selected[r.continuous.id] === undefined;
-        if (r.type === 'categorical_multi') return mode === 'selected' ? (selectedMulti[r.multi.id] !== undefined && selectedMulti[r.multi.id].length > 0) : (selectedMulti[r.multi.id] === undefined || selectedMulti[r.multi.id].length === 0);
-        const isSelected = r.children.some(c => selected[c.id] === 1);
+        if (r.type === 'categorical_multi') {
+            const isSelectedWithValues = selectedMulti[r.multi.id] !== undefined; // An empty array is a valid selection
+            const isSelectedAsNA = selected[r.multi.id] === 0;
+            return mode === 'selected' ? isSelectedWithValues || isSelectedAsNA : !isSelectedWithValues && !isSelectedAsNA;
+        }
+        const isSelected = r.children.some(c => selected[c.id] !== undefined);
         return mode === 'selected' ? isSelected : !isSelected;
     });
 
@@ -224,8 +236,8 @@ export default function TraitsPanel(props: Props) {
         if (sortBy === "recommend") {
           const suggA = getRowSuggestion(a, suggMap);
           const suggB = getRowSuggestion(b, suggMap);
-          const scoreA = suggA?.score ?? -1;
-          const scoreB = suggB?.score ?? -1;
+          const scoreA = suggA?.score ?? -Infinity;
+          const scoreB = suggB?.score ?? -Infinity;
           if (scoreB !== scoreA) return scoreB - scoreA;
         }
         if (sortBy === "group") {
@@ -266,17 +278,9 @@ export default function TraitsPanel(props: Props) {
               return (<RowRenderer
                 key={r.type === 'binary' ? r.binary.id : r.type === 'continuous' ? r.continuous.id : r.type === 'categorical_multi' ? r.multi.id : r.traitName}
                 r={r}
-                selected={selected}
-                selectedMulti={selectedMulti}
-                setBinary={setBinary}
-                setContinuous={setContinuous}
-                setMulti={setMulti}
-                setDerivedPick={setDerivedPick}
-                clearDerived={clearDerived}
-                rank={sortBy === 'recommend' ? localSuggRank[suggestion?.traitId ?? ''] : undefined}
                 suggestion={suggestion}
-                lang={lang}
-                onTraitSelect={onTraitSelect}
+                rank={sortBy === 'recommend' ? localSuggRank[suggestion?.traitId ?? ''] : undefined}
+                {...props}
               />);
             })}
           </TableBody>
