@@ -1,12 +1,13 @@
 // frontend/src/components/header/Ribbon.tsx
 import React, { useState } from "react";
 import {
-  AppBar, Box, Collapse, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Toolbar, Tooltip, Typography, Switch
+  AppBar, Box, Collapse, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Toolbar, Tooltip, Typography, Switch, SelectChangeEvent, Theme, IconButton
 } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import ScienceIcon from '@mui/icons-material/Science';
 import TranslateIcon from '@mui/icons-material/Translate';
 import HomeIcon from '@mui/icons-material/Home';
+import CloseIcon from '@mui/icons-material/Close';
 
 import RibbonWelcomeTab from "./RibbonWelcomeTab";
 import RibbonCandidatesTab from "./RibbonCandidatesTab";
@@ -55,14 +56,14 @@ export default function Ribbon(props: RibbonProps) {
         color="default"
         elevation={0}
         sx={{
-            zIndex: (theme) => theme.zIndex.drawer + 1,
+            zIndex: (theme: Theme) => theme.zIndex.drawer + 1,
         }}
     >
       <Toolbar sx={{ px: 2, minHeight: 48, gap: 2 }}>
         <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold", cursor: 'pointer' }} onClick={() => BrowserOpenURL("https://github.com/soshimizu/identification-key")}>
             {T.appTitle}
         </Typography>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} onMouseLeave={() => setTab(false)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
+        <Tabs value={tab} onChange={(_, v: TabKey | false) => setTab(v)} onMouseLeave={() => setTab(false)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
           <Tab onMouseEnter={() => setTab("welcome")} icon={<HomeIcon />} iconPosition="start" label={T.ribbon.welcome} value="welcome" />
           <Tab onMouseEnter={() => setTab("candidates")} icon={<ScienceIcon />} iconPosition="start" label={T.ribbon.candidates_settings} value="candidates" />
           <Tab onMouseEnter={() => setTab("traits")} icon={<TuneIcon />} iconPosition="start" label={T.ribbon.traits_settings} value="traits" />
@@ -71,7 +72,7 @@ export default function Ribbon(props: RibbonProps) {
         {onPickKey && (
           <FormControl size="small" sx={{ minWidth: 240, mr: 1 }}>
             <InputLabel>{T.ribbon.switchMatrix}</InputLabel>
-            <Select label={T.ribbon.switchMatrix} value={activeKey || ""} onChange={(e) => onPickKey(String(e.target.value))}>
+            <Select label={T.ribbon.switchMatrix} value={activeKey || ""} onChange={(e: SelectChangeEvent<string>) => onPickKey(String(e.target.value))}>
               {(keys || []).map((k) => <MenuItem key={k.name} value={k.name}>{k.name}</MenuItem>)}
             </Select>
           </FormControl>
@@ -79,18 +80,18 @@ export default function Ribbon(props: RibbonProps) {
         {setLang && (
             <FormControl size="small" variant="outlined" sx={{ minWidth: 140 }}>
                 <InputLabel>Language</InputLabel>
-                <Select label="Language" value={lang} onChange={(e) => setLang(e.target.value as "ja" | "en")} startAdornment={<TranslateIcon fontSize="small" sx={{mr: 1, color: 'action.active'}}/>}>
+                <Select label="Language" value={lang} onChange={(e: SelectChangeEvent<"ja" | "en">) => setLang(e.target.value as "ja" | "en")} startAdornment={<TranslateIcon fontSize="small" sx={{mr: 1, color: 'action.active'}}/>}>
                 <MenuItem value="ja">日本語</MenuItem>
                 <MenuItem value="en">English</MenuItem>
                 </Select>
             </FormControl>
         )}
         <Tooltip title={T.ribbon.switchTheme}>
-            <Switch checked={themeMode === 'dark'} onChange={(e) => setThemeMode(e.target.checked ? 'dark' : 'light')} />
+            <Switch checked={themeMode === 'dark'} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setThemeMode(e.target.checked ? 'dark' : 'light')} />
         </Tooltip>
       </Toolbar>
 
-      <Collapse in={tab !== false} timeout={300}>
+      <Collapse in={tab !== false} sx={{ transitionDuration: '800ms' }}>
         <Box
             onMouseEnter={() => setTab(tab)} onMouseLeave={() => setTab(false)}
             sx={{
@@ -102,9 +103,12 @@ export default function Ribbon(props: RibbonProps) {
                 bgcolor: 'background.default',
                 boxShadow: '0px 4px 12px -2px rgba(0,0,0,0.1)',
                 borderBottom: 1,
-                borderBottomColor: (theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.300',
+                borderBottomColor: (theme: Theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.300',
             }}
         >
+          <IconButton onClick={() => setTab(false)} sx={{ position: 'absolute', top: 8, right: 8 }}>
+            <CloseIcon />
+          </IconButton>
           {tab === "welcome" && <RibbonWelcomeTab lang={lang} />}
           {tab === "candidates" && <RibbonCandidatesTab lang={lang} matrixName={matrixName} algorithm={algo} onAlgorithmChange={setAlgo} opts={opts} setOpts={setOpts} />}
           {tab === "traits" && <RibbonTraitsTab lang={lang} opts={opts} setOpts={setOpts} />}

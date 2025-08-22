@@ -3,6 +3,7 @@ package engine
 
 import (
 	"errors"
+	"log"
 	"math"
 	"sort"
 )
@@ -49,22 +50,26 @@ const largeNegativeLogLikelihood = -1e6 // Penalty base for conflicts
 // jaccardSimilarity calculates the Jaccard index between two sets of strings.
 func jaccardSimilarity(set1, set2 []string) float64 {
 	intersectionSize := 0
-	unionSize := len(set1) + len(set2)
 
 	map1 := make(map[string]struct{}, len(set1))
 	for _, item := range set1 {
 		map1[item] = struct{}{}
 	}
 
+	map2 := make(map[string]struct{}, len(set2))
 	for _, item := range set2 {
-		if _, found := map1[item]; found {
+		map2[item] = struct{}{}
+	}
+
+	for item := range map1 {
+		if _, found := map2[item]; found {
 			intersectionSize++
 		}
 	}
 
-	unionSize -= intersectionSize // Correct union size
+	unionSize := len(map1) + len(map2) - intersectionSize
 	if unionSize == 0 {
-		return 1.0 // Both sets are empty
+		return 1.0 // Both sets are empty, similarity is 1.
 	}
 	return float64(intersectionSize) / float64(unionSize)
 }
@@ -83,7 +88,6 @@ func hasIntersection(set1, set2 []string) bool {
 	return false
 }
 
-// logProbContinuous (no changes needed)
 func logProbContinuous(obsValue float64, truthMin, truthMax float64, toleranceFactor float64) float64 {
 	truthRange := truthMax - truthMin
 	if toleranceFactor < 0 {
@@ -115,7 +119,6 @@ func logProbContinuous(obsValue float64, truthMin, truthMax float64, toleranceFa
 	return largeNegativeLogLikelihood
 }
 
-// logProbBinary (no changes needed)
 func logProbBinary(obs int, truth int, alpha, beta, conflictPenaltyFactor float64) float64 {
 	obsNorm := 0
 	if obs == 1 {
@@ -145,24 +148,23 @@ func logProbBinary(obs int, truth int, alpha, beta, conflictPenaltyFactor float6
 	return 0
 }
 
-// New function to handle categorical multi traits
-func logProbCategoricalMulti(obsStates, truthStates []string, algo string, jaccardThreshold float64, alpha, beta, conflictPenalty float64) float64 {
+func logProbCategoricalMulti(taxonIdx int, obsStates, truthStates []string, algo string, jaccardThreshold float64, alpha, beta, conflictPenalty float64) float64 {
 	var isMatch bool
+
+	log.Printf("[Matcher] Taxon %d: Comparing Obs %v WITH Truth %v", taxonIdx, obsStates, truthStates)
+
 	if algo == "jaccard" {
-		isMatch = jaccardSimilarity(obsStates, truthStates) >= jaccardThreshold
+		similarity := jaccardSimilarity(obsStates, truthStates)
+		isMatch = similarity >= jaccardThreshold
+		log.Printf("[Matcher] Taxon %d: Jaccard similarity = %.2f, Threshold = %.2f -> isMatch = %t", taxonIdx, similarity, jaccardThreshold, isMatch)
 	} else { // "binary"
 		isMatch = hasIntersection(obsStates, truthStates)
+		log.Printf("[Matcher] Taxon %d: Intersection found -> isMatch = %t", taxonIdx, isMatch)
 	}
 
-	// Treat this as a single binary observation: Does the observation match the truth?
-	// If it matches, we use the "true positive" probability (1-beta).
-	// If it mismatches, we use the "false positive" probability (alpha).
-	// This is a simplification but provides a consistent probabilistic framework.
 	if isMatch {
-		// No conflict: analogous to truth=Yes, obs=Yes
 		return logProbBinary(1, 1, alpha, beta, conflictPenalty)
 	}
-	// Conflict: analogous to truth=No, obs=Yes
 	return logProbBinary(1, 0, alpha, beta, conflictPenalty)
 }
 
@@ -265,9 +267,6 @@ func EvalBayesPosteriorGeneric(
 					lp += math.Log(p.GammaNAPenalty) + math.Log(pr)
 				} else if len(truth.States) == 1 {
 					lp += logProbBinary(obs.State, truth.States[0], p.AlphaFP, p.BetaFN, p.ConflictPenalty)
-				} else {
-					// Handle polymorphic binary traits
-					// ... (existing logic)
 				}
 			case BayesTraitContinuous:
 				if truth.Unknown {
@@ -279,7 +278,7 @@ func EvalBayesPosteriorGeneric(
 				if truth.Unknown {
 					lp += math.Log(p.GammaNAPenalty)
 				} else {
-					lp += logProbCategoricalMulti(obs.StatesMulti, truth.StatesMulti, p.CategoricalAlgo, p.JaccardThreshold, p.AlphaFP, p.BetaFN, p.ConflictPenalty)
+					lp += logProbCategoricalMulti(i, obs.StatesMulti, truth.StatesMulti, p.CategoricalAlgo, p.JaccardThreshold, p.AlphaFP, p.BetaFN, p.ConflictPenalty)
 				}
 			}
 		}

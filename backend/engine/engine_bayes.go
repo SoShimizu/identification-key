@@ -2,12 +2,12 @@
 package engine
 
 import (
+	"log"
 	"sort"
 )
 
 // evaluateBayes handles the core logic for Bayesian evaluation.
-// It prepares data getters for the generic evaluation function.
-func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode string) ([]BayesRanked, []TaxonScore, error) {
+func evaluateBayes(m *Matrix, selected map[string]int, selectedMulti map[string][]string, opt AlgoOptions, mode string) ([]BayesRanked, []TaxonScore, error) {
 	nTaxa := len(m.Taxa)
 
 	traitMap := make(map[string]Trait)
@@ -15,14 +15,18 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 		traitMap[t.ID] = t
 	}
 
-	activeTraitIDs := make([]string, 0, len(selected))
+	activeTraitIDs := make([]string, 0, len(selected)+len(selectedMulti))
 	for id, val := range selected {
-		if _, ok := traitMap[id]; ok {
-			if val != 0 {
-				activeTraitIDs = append(activeTraitIDs, id)
-			}
+		if _, ok := traitMap[id]; ok && val != 0 {
+			activeTraitIDs = append(activeTraitIDs, id)
 		}
 	}
+	for id, val := range selectedMulti {
+		if _, ok := traitMap[id]; ok && len(val) > 0 {
+			activeTraitIDs = append(activeTraitIDs, id)
+		}
+	}
+	log.Printf("[Bayes] Active Trait IDs for evaluation: %v", activeTraitIDs)
 
 	// getTruth provides the ground truth data for a given taxon and trait.
 	getTruth := func(taxonIdx int, traitID string) (BayesTruth, bool) {
@@ -33,6 +37,11 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 		trait, ok := traitMap[traitID]
 		if !ok {
 			return BayesTruth{Unknown: true}, false
+		}
+
+		if trait.Type == "categorical_multi" {
+			truthValues, _ := taxon.CategoricalTraits[traitID]
+			log.Printf("[getTruth] For Taxon '%s', Trait '%s', DB value is: %v", taxon.Name, trait.Name, truthValues)
 		}
 
 		switch trait.Type {
@@ -57,11 +66,6 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 
 	// getObs provides the user's observation for a given trait.
 	getObs := func(traitID string) (BayesObservation, bool) {
-		val, ok := selected[traitID]
-		if !ok || val == 0 {
-			return BayesObservation{IsNA: true}, false
-		}
-
 		trait, ok := traitMap[traitID]
 		if !ok {
 			return BayesObservation{IsNA: true}, false
@@ -69,28 +73,29 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 
 		switch trait.Type {
 		case "continuous":
-			return BayesObservation{Kind: BayesTraitContinuous, Value: float64(val)}, true
+			if val, ok := selected[traitID]; ok && val != 0 {
+				return BayesObservation{Kind: BayesTraitContinuous, Value: float64(val)}, true
+			}
 		case "categorical_multi":
-			var selectedStates []string
-			for i, state := range trait.States {
-				if (val>>i)&1 == 1 {
-					selectedStates = append(selectedStates, state)
-				}
+			// MODIFIED: Read directly from selectedMulti map
+			if states, ok := selectedMulti[traitID]; ok && len(states) > 0 {
+				log.Printf("[getObs] User selection for trait '%s': %v", trait.Name, states)
+				return BayesObservation{Kind: BayesTraitCategoricalMulti, StatesMulti: states}, true
 			}
-			if len(selectedStates) > 0 {
-				return BayesObservation{Kind: BayesTraitCategoricalMulti, StatesMulti: selectedStates}, true
-			}
-			return BayesObservation{IsNA: true}, false
 		default: // binary
-			return BayesObservation{Kind: BayesTraitBinary, K: 2, State: val}, true
+			if val, ok := selected[traitID]; ok && val != 0 {
+				return BayesObservation{Kind: BayesTraitBinary, K: 2, State: val}, true
+			}
 		}
+
+		return BayesObservation{IsNA: true}, false
 	}
 
-	// Prepare parameters for the Bayesian evaluation, ensuring all opts are passed correctly.
+	// Prepare parameters for the Bayesian evaluation...
 	evalParams := BayesEvalParams{
 		AlphaFP:          opt.DefaultAlphaFP,
 		BetaFN:           opt.DefaultBetaFN,
-		GammaNAPenalty:   opt.GammaNAPenalty, // CRITICAL FIX: Use the value from opt, not a hardcoded one.
+		GammaNAPenalty:   opt.GammaNAPenalty,
 		Kappa:            opt.Kappa,
 		EpsilonCut:       1e-6,
 		ConflictPenalty:  opt.ConflictPenalty,
@@ -114,7 +119,7 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 		if r.Index >= 0 && r.Index < len(m.Taxa) {
 			taxon = m.Taxa[r.Index]
 		}
-		matches, support, conflicts := computeMatchStatsGeneric(m, &taxon, selected, traitMap, opt)
+		matches, support, conflicts := computeMatchStatsGeneric(m, &taxon, selected, selectedMulti, traitMap, opt)
 
 		scores[i] = TaxonScore{
 			Index:     r.Index,
@@ -139,13 +144,14 @@ func evaluateBayes(m *Matrix, selected map[string]int, opt AlgoOptions, mode str
 }
 
 // computeMatchStatsGeneric computes match/support/conflict stats for all trait types.
-func computeMatchStatsGeneric(m *Matrix, taxon *Taxon, selected map[string]int, traitMap map[string]Trait, opt AlgoOptions) (matches, support, conflicts int) {
+func computeMatchStatsGeneric(m *Matrix, taxon *Taxon, selected map[string]int, selectedMulti map[string][]string, traitMap map[string]Trait, opt AlgoOptions) (matches, support, conflicts int) {
+	// Handle binary and continuous traits from 'selected'
 	for traitID, obsValue := range selected {
 		if obsValue == 0 {
 			continue
 		}
 		trait, ok := traitMap[traitID]
-		if !ok {
+		if !ok || trait.Type == "categorical_multi" { // Skip multi here
 			continue
 		}
 
@@ -169,29 +175,35 @@ func computeMatchStatsGeneric(m *Matrix, taxon *Taxon, selected map[string]int, 
 			if float64(obsValue) >= truth.Min && float64(obsValue) <= truth.Max {
 				isMatch = true
 			}
-		case "categorical_multi":
-			truthStates, ok := taxon.CategoricalTraits[traitID]
-			if !ok || len(truthStates) == 0 {
-				continue
-			}
-			var selectedStates []string
-			for i, state := range trait.States {
-				if (obsValue>>i)&1 == 1 {
-					selectedStates = append(selectedStates, state)
-				}
-			}
-			if len(selectedStates) == 0 {
-				continue
-			}
+		}
 
-			if opt.CategoricalAlgo == "jaccard" {
-				if jaccardSimilarity(selectedStates, truthStates) >= opt.JaccardThreshold {
-					isMatch = true
-				}
-			} else { // "binary"
-				if hasIntersection(selectedStates, truthStates) {
-					isMatch = true
-				}
+		if isMatch {
+			matches++
+		} else {
+			conflicts++
+		}
+	}
+
+	// MODIFIED: Handle categorical_multi traits directly from 'selectedMulti'
+	for traitID, selectedStates := range selectedMulti {
+		if len(selectedStates) == 0 {
+			continue
+		}
+		support++
+		isMatch := false
+
+		truthStates, ok := taxon.CategoricalTraits[traitID]
+		if !ok || len(truthStates) == 0 {
+			continue // Taxon has no data for this trait
+		}
+
+		if opt.CategoricalAlgo == "jaccard" {
+			if jaccardSimilarity(selectedStates, truthStates) >= opt.JaccardThreshold {
+				isMatch = true
+			}
+		} else { // "binary"
+			if hasIntersection(selectedStates, truthStates) {
+				isMatch = true
 			}
 		}
 

@@ -35,7 +35,8 @@ export const STR = {
         tooltip_post: "事後確率：現在の観測と整合する度合い。高いほど有力な候補です。",
         tooltip_score: "一致率スコア：選択された形質との単純な一致率。",
         tooltip_delta: "1位との差：小さいほど競っている状態を示します。",
-        tooltip_conflicts: "矛盾数：選択した形質とタクソンのデータが明確に矛盾する数。",
+        tooltip_conflicts: "矛盾数：選択した形質とタクソンのデータが明確に矛盾する数。\n\n※名義形質（例:体色）を1つ選択すると、内部では複数のYes/No情報（例:「色はオレンジ(Y)」「色は黒(N)」）に分解されます。そのため、1回の選択で複数の矛盾が計上されることがあります。",
+        tooltip_match_support: "一致数/評価数：\n\n※名義形質（例:体色）を1つ選択すると、内部では複数のYes/No情報（例:「色はオレンジ(Y)」「色は黒(N)」）に分解されます。そのため、1回の選択で複数の評価点（Support）が計上されることがあります。",
         compare_button: "比較",
         show_match_support: "Match/Supportを表示",
     },
@@ -68,7 +69,7 @@ export const STR = {
       table_header_demerit: "デメリット",
       param_conflict: {
           title: "矛盾の扱い",
-          name: "矛盾ペナルティ (既定値: 1.0)",
+          name: "矛盾ペナルティ (既定値: 0.5)",
           description: "観察結果とマトリクスのデータが明確に違う（例：Yesを選択したがデータはNo）場合のペナルティの強さを決めます。",
           effect: "値を1.0 (Strict) に近づけるほど、わずかな矛盾でも候補から除外されやすくなります。0.0 (Lenient) に近づけると、多少の矛盾は許容して候補に残りやすくなります。",
           tradeoffs: [
@@ -136,12 +137,25 @@ export const STR = {
             title: "複数選択形質の扱い",
         },
         categorical_algo: {
-            name: "評価アルゴリズム (既定値: Jaccard)",
-            desc_jaccard: "【Jaccard】選択した項目とデータの一致度(集合の類似度)で評価します。『日本と韓国に分布』というデータに対し『日本』とだけ選択した場合、部分的に一致していると見なされます。",
-            desc_binary: "【Binary】選択した項目のうち、1つでもデータに含まれていれば完全に一致と見なします。『日本』と選択すれば、『日本と韓国に分布』は完全一致となります。",
+            name: "評価アルゴリズム (既定値: Binary)",
+            table_header_algorithm: "アルゴリズム",
+            table_header_use_case: "推奨される利用場面",
+            table_header_pros_cons: "長所と短所",
+            algorithms: [
+                {
+                    name: "Binary",
+                    use_case: "分布域や宿主など「選択した項目のうち、一つでも合致すれば良い」場合に最適です。",
+                    pros_cons: "長所: 直感的で分かりやすい。短所: 一致度の「度合い」は評価しない。"
+                },
+                {
+                    name: "Jaccard",
+                    use_case: "斑紋パターンなど「選択した項目の多くが、データと一致している必要がある」場合に有効です。",
+                    pros_cons: "長所: 集合としての一致度を厳密に評価できる。短所: 閾値設定が結果に大きく影響する。"
+                }
+            ]
         },
         jaccard_threshold: {
-            name: "Jaccard類似度しきい値 (既定値: 0.5)",
+            name: "Jaccard類似度しきい値 (既定値: 0.01)",
             description: "Jaccardモードの際、「一致」と判断するのに必要となる類似度の下限値です。",
             effect: "値を高くするほど、より多くの項目が一致しないと「一致」と見なされなくなります。",
             tradeoffs: [
@@ -152,7 +166,6 @@ export const STR = {
       },
   },
   en: {
-    // English translations follow the same structure
     appTitle: "ClavisID",
     panels: {
         candidates: "Candidates",
@@ -186,7 +199,8 @@ export const STR = {
         tooltip_post: "Posterior Probability: The degree to which the candidate matches the current observations. Higher is better.",
         tooltip_score: "Match Score: The simple percentage of matching traits.",
         tooltip_delta: "Delta: The difference from the top candidate. A smaller value indicates a closer match.",
-        tooltip_conflicts: "Conflicts: The number of direct contradictions between selected traits and the taxon's data.",
+        tooltip_conflicts: "Conflicts: Number of contradictions between your selections and the taxon's data.\n\nNote: Selecting one state of a multi-state trait (e.g., Body Color) is internally converted into multiple Yes/No statements. This can result in multiple conflicts from a single selection.",
+        tooltip_match_support: "Matches / Support:\n\nNote: Selecting one state of a multi-state trait (e.g., Body Color) is internally converted into multiple Yes/No statements. This can result in multiple support points from a single selection.",
         compare_button: "Compare",
         show_match_support: "Show Match/Support",
     },
@@ -219,7 +233,7 @@ export const STR = {
         table_header_demerit: "Demerit",
         param_conflict: {
             title: "Conflict Handling",
-            name: "Conflict Penalty (Default: 1.0)",
+            name: "Conflict Penalty (Default: 0.5)",
             description: "Determines the penalty strength when an observation clearly contradicts the matrix data (e.g., selecting 'Yes' when the data is 'No').",
             effect: "Closer to 1.0 (Strict), candidates are more easily excluded by slight conflicts. Closer to 0.0 (Lenient), some conflicts are tolerated, and candidates are more likely to remain.",
             tradeoffs: [
@@ -287,12 +301,25 @@ export const STR = {
             title: "Multi-Select Trait Handling",
         },
         categorical_algo: {
-            name: "Evaluation Algorithm (Default: Jaccard)",
-            desc_jaccard: "[Jaccard] Evaluates based on the degree of overlap (set similarity). If the data is 'Japan; Korea' and you select only 'Japan', it's treated as a partial match.",
-            desc_binary: "[Binary] Considers it a full match if at least one of the selected items is present in the data. If you select 'Japan', 'Japan; Korea' is a perfect match.",
+            name: "Evaluation Algorithm (Default: Binary)",
+            table_header_algorithm: "Algorithm",
+            table_header_use_case: "Recommended Use Case",
+            table_header_pros_cons: "Pros & Cons",
+            algorithms: [
+                {
+                    name: "Binary",
+                    use_case: "Ideal for traits like distribution or hosts, where a match with any one of the selected items is sufficient.",
+                    pros_cons: "Pros: Intuitive and straightforward. Cons: Does not evaluate the 'degree' of the match."
+                },
+                {
+                    name: "Jaccard",
+                    use_case: "Effective when a high degree of overlap between the selected items and the data is required, such as for components of a spot pattern.",
+                    pros_cons: "Pros: Strictly evaluates the similarity between sets. Cons: The threshold setting significantly impacts results."
+                }
+            ]
         },
         jaccard_threshold: {
-            name: "Jaccard Similarity Threshold (Default: 0.5)",
+            name: "Jaccard Similarity Threshold (Default: 0.01)",
             description: "The minimum similarity score required to be considered a 'match' when using the Jaccard algorithm.",
             effect: "A higher value requires more of the selected items to be present in the data to be considered a match.",
             tradeoffs: [

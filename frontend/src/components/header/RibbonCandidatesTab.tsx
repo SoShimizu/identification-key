@@ -94,7 +94,7 @@ export default function RibbonCandidatesTab(props: Props) {
                     <CardContent>
                         <SettingItem lang={lang} title={T.param_conflict.name} description={T.param_conflict.description} effect={T.param_conflict.effect} tradeoffs={T.param_conflict.tradeoffs}>
                             <Box sx={{ px: 1}}>
-                                <Slider min={0} max={1} step={0.05} value={saneOpts.conflictPenalty} onChange={(_, v) => setOpts(p => ({...p, conflictPenalty: v as number}))} valueLabelDisplay="auto" />
+                                <Slider min={0} max={1} step={0.01} value={saneOpts.conflictPenalty} onChange={(_, v) => setOpts(p => ({...p, conflictPenalty: v as number}))} valueLabelDisplay="auto" />
                                 <Stack direction="row" justifyContent="space-between"><Typography variant="caption">0.0 (Lenient)</Typography><Typography variant="caption">1.0 (Strict)</Typography></Stack>
                             </Box>
                         </SettingItem>

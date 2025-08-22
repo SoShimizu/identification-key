@@ -6,7 +6,7 @@ import (
 	"sort"
 )
 
-func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, opt AlgoOptions) (*EvalResult, error) {
+func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, selectedMulti map[string][]string, mode, algo string, opt AlgoOptions) (*EvalResult, error) {
 	if m == nil {
 		return nil, errors.New("no matrix loaded")
 	}
@@ -22,8 +22,7 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 
 	switch algo {
 	case "heuristic":
-		// Note: Heuristic mode doesn't currently support categorical_multi traits.
-		// It could be extended to do so if needed.
+		// Note: Heuristic mode needs updating if it is to support categorical_multi traits.
 		scores, err = evaluateHeuristic(m, selected, mode)
 		if err == nil {
 			post = make([]float64, len(m.Taxa))
@@ -40,7 +39,7 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 	default: // "bayes"
 		var ranked []BayesRanked
 		// Pass the new options to the bayesian evaluator
-		ranked, scores, err = evaluateBayes(m, selected, opt, mode)
+		ranked, scores, err = evaluateBayes(m, selected, selectedMulti, opt, mode)
 		if err == nil {
 			post = make([]float64, len(m.Taxa))
 			for _, r := range ranked {
@@ -72,7 +71,19 @@ func ApplyFiltersAlgoOpt(m *Matrix, selected map[string]int, mode, algo string, 
 	var sugg []TraitSuggestion
 	if opt.WantInfoGain && post != nil {
 		tau := 0.01
-		sugg = SuggestTraitsBayes(m, post, tau, selected, opt) // Pass opt here
+		// Combine selected and selectedMulti for suggestion filtering
+		allSelected := make(map[string]int)
+		for k, v := range selected {
+			if v != 0 {
+				allSelected[k] = v
+			}
+		}
+		for k, v := range selectedMulti {
+			if len(v) > 0 {
+				allSelected[k] = 1 // Mark as selected
+			}
+		}
+		sugg = SuggestTraitsBayes(m, post, tau, allSelected, opt) // Pass combined map
 	}
 
 	return &EvalResult{

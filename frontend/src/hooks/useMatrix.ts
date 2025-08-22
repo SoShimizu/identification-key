@@ -23,10 +23,10 @@ type UseMatrixReturn = {
     matrixName: string;
     taxaCount: number;
     selected: Record<string, Choice>;
-    selectedMulti: Record<string, MultiChoice>; // New state for multi-choice traits
+    selectedMulti: Record<string, MultiChoice>; 
     setBinary: (traitId: string, val: Choice, label?: string) => void;
     setContinuous: (traitId: string, val: number | null, label?: string) => void;
-    setMulti: (traitId: string, values: MultiChoice, label?: string) => void; // New setter for multi-choice
+    setMulti: (traitId: string, values: MultiChoice, label?: string) => void; 
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel?: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
     clearAllSelections: () => void;
@@ -141,30 +141,13 @@ export function useMatrix(): UseMatrixReturn {
   // === Evaluation (debounced) ===
   const runEval = useCallback(async () => {
     try {
-        // Convert multi-selections to a bitmask for the backend
-        const combinedSelected = { ...selected };
-        for (const traitId in selectedMulti) {
-            const trait = traits.find(t => t.id === traitId);
-            if (trait && trait.states) {
-                let bitmask = 0;
-                for (let i = 0; i < trait.states.length; i++) {
-                    if (selectedMulti[traitId].includes(trait.states[i])) {
-                        bitmask |= (1 << i);
-                    }
-                }
-                if (bitmask > 0) {
-                    combinedSelected[traitId] = bitmask;
-                }
-            }
-        }
-
-        const res = await applyFilters(combinedSelected, mode, algo, { ...opts, wantInfoGain: true });
+        const res = await applyFilters(selected, selectedMulti, mode, algo, { ...opts, wantInfoGain: true });
         setScores(res.scores || []);
         setSuggs(res.suggestions || []);
     } catch (error) {
         console.error("Failed to run evaluation:", error);
     }
-  }, [selected, selectedMulti, traits, mode, algo, opts]);
+  }, [selected, selectedMulti, mode, algo, opts]);
 
 
   const runEvalDebounced = useDebouncedCallback(runEval, 120);

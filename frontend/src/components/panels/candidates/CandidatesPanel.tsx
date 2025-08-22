@@ -56,8 +56,21 @@ export default function CandidatesPanel({
     }
   };
   
+  const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const newSelecteds = rows.map((r) => r.taxon.id).filter((id): id is string => !!id);
+      setComparisonList(newSelecteds);
+      return;
+    }
+    setComparisonList([]);
+  };
+
   const scoreHeader = algo === 'bayes' ? T.header_post_prob : T.header_score;
   const scoreTooltip = algo === 'bayes' ? T.tooltip_post : T.tooltip_score;
+  
+  const numSelected = comparisonList.length;
+  const rowCount = rows.length;
+  const isAllSelected = rowCount > 0 && numSelected === rowCount;
 
   return (
     <Paper sx={{ height: "100%", display: "flex", flexDirection: "column", p: 1.5 }}>
@@ -86,13 +99,20 @@ export default function CandidatesPanel({
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox"></TableCell>
+              <TableCell padding="checkbox">
+                <Checkbox
+                    indeterminate={numSelected > 0 && numSelected < rowCount}
+                    checked={isAllSelected}
+                    onChange={handleSelectAllClick}
+                    inputProps={{ 'aria-label': 'select all candidates' }}
+                />
+              </TableCell>
               <TableCell sx={{ width: 50 }}>{T.header_rank}</TableCell>
               <TableCell>{T.header_name}</TableCell>
               <TableCell sx={{ width: 120 }}><Tooltip title={scoreTooltip}><span>{scoreHeader}</span></Tooltip></TableCell>
               <TableCell sx={{ width: 80 }}><Tooltip title={T.tooltip_delta}><span>{T.header_delta}</span></Tooltip></TableCell>
-              <TableCell sx={{ width: 70 }} align="center"><Tooltip title={T.tooltip_conflicts}><span>{T.header_conflicts}</span></Tooltip></TableCell>
-              {showMatchSupport && <TableCell sx={{ width: 110 }}>{T.header_match_support}</TableCell>}
+              <TableCell sx={{ width: 70 }} align="center"><Tooltip title={<Typography sx={{whiteSpace: 'pre-line'}}>{T.tooltip_conflicts}</Typography>}><span>{T.header_conflicts}</span></Tooltip></TableCell>
+              {showMatchSupport && <TableCell sx={{ width: 110 }}><Tooltip title={<Typography sx={{whiteSpace: 'pre-line'}}>{T.tooltip_match_support}</Typography>}><span>{T.header_match_support}</span></Tooltip></TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>

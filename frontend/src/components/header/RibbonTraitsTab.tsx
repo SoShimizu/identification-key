@@ -19,7 +19,7 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
   const T = STR[lang].traitsTab;
   const saneOpts = useMemo(() => clampAlgoOptions(opts), [opts]);
 
-  const handleBool = (key: keyof AlgoOptions) => (_: any, checked: boolean) => {
+  const handleBool = (key: keyof AlgoOptions) => (_: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
       setOpts(prev => ({ ...prev, [key]: checked }));
   };
 
@@ -36,7 +36,7 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                     control={<Switch checked={opts.usePragmaticScore} onChange={handleBool("usePragmaticScore")} />}
                     label={<Typography variant="subtitle2">{T.pragmatic_score.name}</Typography>}
                 />
-                <Box sx={{ p: 1, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
                         {T.pragmatic_score.description}{'\n\n'}
                         <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.pragmatic_score.effect}
@@ -80,7 +80,7 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                         <Typography variant="caption">50% (Lenient)</Typography>
                     </Stack>
                  </Box>
-                 <Box sx={{ p: 1, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                 <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
                         {T.param_tolerance.description}{'\n\n'}
                         <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.param_tolerance.effect}
@@ -113,13 +113,28 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                 <FormControl>
                     <Typography variant="subtitle2" gutterBottom>{T.categorical_algo.name}</Typography>
                     <RadioGroup row value={opts.categoricalAlgo} onChange={handleRadio("categoricalAlgo")}>
-                        <FormControlLabel value="jaccard" control={<Radio size="small" />} label="Jaccard" />
                         <FormControlLabel value="binary" control={<Radio size="small" />} label="Binary" />
+                        <FormControlLabel value="jaccard" control={<Radio size="small" />} label="Jaccard" />
                     </RadioGroup>
-                     <Box sx={{ p: 1, my: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                        <Typography variant="caption" color="text.secondary" display="block">
-                            {opts.categoricalAlgo === 'jaccard' ? T.categorical_algo.desc_jaccard : T.categorical_algo.desc_binary}
-                        </Typography>
+                     <Box sx={{ p: 1.5, my: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                        <Table size="small" sx={{ '.MuiTableCell-root': { p: 0.5, border: 'none', fontSize: '0.75rem' } }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.categorical_algo.table_header_algorithm}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.categorical_algo.table_header_use_case}</Typography></TableCell>
+                                    <TableCell><Typography variant="caption" sx={{fontWeight: 'bold'}}>{T.categorical_algo.table_header_pros_cons}</Typography></TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {T.categorical_algo.algorithms.map(item => (
+                                    <TableRow key={item.name}>
+                                        <TableCell><Typography variant="caption" color="text.secondary"><strong>{item.name}</strong></Typography></TableCell>
+                                        <TableCell><Typography variant="caption" color="text.secondary">{item.use_case}</Typography></TableCell>
+                                        <TableCell><Typography variant="caption" color="text.secondary">{item.pros_cons}</Typography></TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                      </Box>
                 </FormControl>
                 <Divider sx={{ my: 1.5 }} />
@@ -130,14 +145,14 @@ export default function RibbonTraitsTab({ opts, setOpts, lang }: Props) {
                             disabled={opts.categoricalAlgo !== 'jaccard'}
                             value={saneOpts.jaccardThreshold}
                             onChange={(_, v) => setOpts(p => ({ ...p, jaccardThreshold: v as number }))}
-                            min={0} max={1} step={0.05} valueLabelDisplay="auto"
+                            min={0} max={1} step={0.01} valueLabelDisplay="auto"
                         />
                         <Stack direction="row" justifyContent="space-between">
                             <Typography variant="caption">0.0 (Lenient)</Typography>
                             <Typography variant="caption">1.0 (Strict)</Typography>
                         </Stack>
                     </Box>
-                    <Box sx={{ p: 1, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
+                    <Box sx={{ p: 1.5, mt: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{whiteSpace: 'pre-wrap'}}>
                             {T.jaccard_threshold.description}{'\n\n'}
                             <strong>{STR[lang].candidatesTab.effect_label}:</strong> {T.jaccard_threshold.effect}

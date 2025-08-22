@@ -2,7 +2,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,7 +112,7 @@ func writeSampleMixedV2(outpath string) error {
 	sh := "Matrix"
 	f.SetSheetName(f.GetSheetName(0), sh)
 
-	header := append([]string{"#Group", "#Trait", "#Type", "#Difficulty", "#Risk", "#HelpText"}, species10()...)
+	header := append([]string{"#Group", "#Trait", "#Type", "#Difficulty", "#Risk", "#HelpText", "#HelpImages"}, species10()...)
 	for i, v := range header {
 		_ = f.SetCellStr(sh, fmtCell(i+1, 1), v)
 	}
@@ -125,7 +129,14 @@ func writeSampleMixedV2(outpath string) error {
 		_ = f.SetCellStr(sh, fmtCell(5, row), "Low")
 		_ = f.SetCellStr(sh, fmtCell(6, row), fmt.Sprintf("This is a help text for %s.", trip[1]))
 
-		colOffset := 7 // Data starts from the 7th column
+		// MODIFIED: Add sample image to a few traits
+		if r == 0 || r == 7 { // Add to "Antenna long" and "Fore wing fenestra..."
+			_ = f.SetCellStr(sh, fmtCell(7, row), "sample_image.png")
+		} else {
+			_ = f.SetCellStr(sh, fmtCell(7, row), "") // #HelpImages
+		}
+
+		colOffset := 8 // Data starts from the 8th column now
 		switch trip[2] {
 		case "binary":
 			for c := 0; c < 10; c++ {
@@ -202,4 +213,36 @@ func writeSampleSmallV2(outpath string) error {
 		return err
 	}
 	return f.SaveAs(outpath)
+}
+
+// createPlaceholderImage generates a simple 100x100 PNG with a green checkmark
+func createPlaceholderImage() ([]byte, error) {
+	width, height := 100, 100
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// Background
+	bgColor := color.RGBA{240, 240, 240, 255}
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			img.Set(x, y, bgColor)
+		}
+	}
+
+	// Green checkmark
+	checkColor := color.RGBA{34, 139, 34, 255}
+	// Draw the checkmark lines
+	for i := 0; i < 25; i++ {
+		img.Set(25+i, 50+i, checkColor)
+		img.Set(26+i, 50+i, checkColor)
+	}
+	for i := 0; i < 50; i++ {
+		img.Set(50+i, 75-i, checkColor)
+		img.Set(51+i, 75-i, checkColor)
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
