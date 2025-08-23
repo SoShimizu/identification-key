@@ -13,8 +13,10 @@ export const STR = {
     },
     ribbon: {
       welcome: "ようこそ",
-      candidates_settings: "候補タクサ設定",
-      traits_settings: "形質推薦設定",
+      settings: "設定",
+      candidates_settings_short: "候補評価",
+      traits_settings_short: "形質評価",
+      recommend_settings_short: "推薦形質",
       help: "ヘルプ",
       switchTheme: "テーマ切替",
       matrix: "マトリクス",
@@ -111,17 +113,13 @@ export const STR = {
     },
     traitsTab: {
         param_recommend: {
-            title: "形質推薦のスコア計算",
+            title: "推薦形質のスコア計算",
         },
         recommendation_strategy: {
             name: "推薦戦略 (既定値: 一点突破)",
             options: {
                 stable: "安定進行（初心者向け）",
                 breakthrough: "一点突破（専門家向け）",
-            },
-            description: {
-                stable: "どの状態を観察しても、平均的・安定的に候補を絞れる形質を優先して推薦します。",
-                breakthrough: "稀な状態を観察できれば一気に同定が進むような、ハイリスク・ハイリターンな「キラー形質」を優先して推薦します。",
             },
             table_header_strategy: "戦略",
             table_header_merit: "メリット",
@@ -134,10 +132,11 @@ export const STR = {
         pragmatic_score: {
             name: "実用性スコアを有効化 (既定値: 有効)",
             description: "有効にすると、単なる情報量だけでなく、「観察のしやすさ(コスト)」と「見間違いにくさ(リスク)」を考慮して次に調べるべき形質を推薦します。",
-            effect: "観察が難しかったり、専門家でも判断が分かれるような形質の推薦順位が下がります。",
-            tradeoffs: [
-              { setting: "有効", pro: "初心者でも安全で効率的な順序で同定を進められる", con: "常に情報量が最大となる形質が推薦されるとは限らない" }
-            ],
+        },
+        param_dependencies: {
+            title: "形質の表示設定",
+            name: "依存関係を適用 (推奨)",
+            description: "有効にすると、親形質の状態が条件を満たさない形質はリストに表示されなくなります。マトリクスに #TraitID と #Dependency 列が必要です。",
         },
         param_continuous: {
             title: "連続値形質の扱い",
@@ -145,41 +144,16 @@ export const STR = {
         param_tolerance: {
             name: "許容範囲 (Tolerance) (既定値: 10%)",
             description: "連続値（長さなど）のデータ範囲に対して、ユーザーの入力値がどの程度範囲外でも「一致」と見なすかを設定します。",
-            effect: "値を大きくするほど、マトリクスの範囲から多少外れた値でも矛盾と見なされにくくなります。",
-            tradeoffs: [
-              { setting: "高めの値", pro: "個体変異や測定誤差に強くなる", con: "近縁な別種との区別がつきにくくなる可能性" },
-              { setting: "低めの値", pro: "厳密な同定が可能", con: "わずかな変異で候補から除外されやすい" }
-            ]
         },
         param_multi: {
             title: "複数選択形質の扱い",
         },
         categorical_algo: {
             name: "評価アルゴリズム (既定値: Binary)",
-            table_header_algorithm: "アルゴリズム",
-            table_header_use_case: "推奨される利用場面",
-            table_header_pros_cons: "長所と短所",
-            algorithms: [
-                {
-                    name: "Binary",
-                    use_case: "分布域や宿主など「選択した項目のうち、一つでも合致すれば良い」場合に最適です。",
-                    pros_cons: "長所: 直感的で分かりやすい。短所: 一致度の「度合い」は評価しない。"
-                },
-                {
-                    name: "Jaccard",
-                    use_case: "斑紋パターンなど「選択した項目の多くが、データと一致している必要がある」場合に有効です。",
-                    pros_cons: "長所: 集合としての一致度を厳密に評価できる。短所: 閾値設定が結果に大きく影響する。"
-                }
-            ]
         },
         jaccard_threshold: {
             name: "Jaccard類似度しきい値 (既定値: 0.01)",
             description: "Jaccardモードの際、「一致」と判断するのに必要となる類似度の下限値です。",
-            effect: "値を高くするほど、より多くの項目が一致しないと「一致」と見なされなくなります。",
-            tradeoffs: [
-              { setting: "高めの値", pro: "厳密な分布域を持つ種を絞りやすい", con: "情報が不完全な場合に候補から外れやすい" },
-              { setting: "低めの値", pro: "部分的な情報でも候補に残りやすい", con: "絞り込みが甘くなる" }
-            ]
         },
       },
   },
@@ -195,8 +169,10 @@ export const STR = {
     },
     ribbon: {
         welcome: "Welcome",
-        candidates_settings: "Candidate Settings",
-        traits_settings: "Trait Settings",
+        settings: "Settings",
+        candidates_settings_short: "Candidate Eval",
+        traits_settings_short: "Trait Eval",
+        recommend_settings_short: "Recommendation",
         help: "Help",
         switchTheme: "Switch Theme",
         matrix: "Matrix",
@@ -293,17 +269,13 @@ export const STR = {
       },
     traitsTab: {
         param_recommend: {
-            title: "Trait Recommendation Scoring",
+            title: "Recommendation Scoring",
         },
         recommendation_strategy: {
             name: "Recommendation Strategy (Default: Breakthrough)",
             options: {
                 stable: "Stable Progress (for Beginners)",
                 breakthrough: "Breakthrough (for Experts)",
-            },
-            description: {
-                stable: "Recommends traits that, on average, are most effective at narrowing down candidates, regardless of the observed state.",
-                breakthrough: "Prioritizes high-risk, high-reward 'killer traits' that can lead to a definitive identification if a specific rare state is observed.",
             },
             table_header_strategy: "Strategy",
             table_header_merit: "Merit",
@@ -316,10 +288,11 @@ export const STR = {
         pragmatic_score: {
             name: "Enable Pragmatic Score (Default: Enabled)",
             description: "If enabled, recommends the next trait to observe based not just on information theory, but also on 'ease of observation' (cost) and 'risk of misinterpretation'.",
-            effect: "Traits that are difficult to observe or are often ambiguous will be ranked lower in the recommendation list.",
-            tradeoffs: [
-              { setting: "Enabled", pro: "Guides users, especially non-experts, through a safer and more efficient identification path.", con: "May not always suggest the trait that provides the absolute most information." }
-            ],
+        },
+         param_dependencies: {
+            title: "Trait Display Settings",
+            name: "Apply Dependencies (Recommended)",
+            description: "When enabled, traits whose parent conditions are not met will be hidden from the list. Requires #TraitID and #Dependency columns in the matrix.",
         },
         param_continuous: {
             title: "Continuous Trait Handling",
@@ -327,41 +300,16 @@ export const STR = {
         param_tolerance: {
             name: "Tolerance (Default: 10%)",
             description: "Sets how much a user's input for a continuous value (like length) can deviate from the range in the matrix and still be considered a 'match'.",
-            effect: "A higher value makes the system more forgiving of values that fall slightly outside the specified range.",
-            tradeoffs: [
-              { setting: "High Value", pro: "More robust to individual variation and measurement error.", con: "May become harder to distinguish between closely related species." },
-              { setting: "Low Value", pro: "Allows for precise identification.", con: "Minor variations may exclude the correct candidate." }
-            ]
         },
         param_multi: {
             title: "Multi-Select Trait Handling",
         },
         categorical_algo: {
             name: "Evaluation Algorithm (Default: Binary)",
-            table_header_algorithm: "Algorithm",
-            table_header_use_case: "Recommended Use Case",
-            table_header_pros_cons: "Pros & Cons",
-            algorithms: [
-                {
-                    name: "Binary",
-                    use_case: "Ideal for traits like distribution or hosts, where a match with any one of the selected items is sufficient.",
-                    pros_cons: "Pros: Intuitive and straightforward. Cons: Does not evaluate the 'degree' of the match."
-                },
-                {
-                    name: "Jaccard",
-                    use_case: "Effective when a high degree of overlap between the selected items and the data is required, such as for components of a spot pattern.",
-                    pros_cons: "Pros: Strictly evaluates the similarity between sets. Cons: The threshold setting significantly impacts results."
-                }
-            ]
         },
         jaccard_threshold: {
             name: "Jaccard Similarity Threshold (Default: 0.01)",
             description: "The minimum similarity score required to be considered a 'match' when using the Jaccard algorithm.",
-            effect: "A higher value requires more of the selected items to be present in the data to be considered a match.",
-            tradeoffs: [
-              { setting: "High Value", pro: "Good for narrowing down species with very specific distributions.", con: "The correct candidate might be excluded if your information is incomplete." },
-              { setting: "Low Value", pro: "Candidates remain even with partial information.", con: "Less effective at narrowing down the list." }
-            ]
         },
       },
   },

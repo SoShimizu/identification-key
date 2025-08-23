@@ -202,6 +202,7 @@ func (a *App) SaveReportDialog(defaultName string) (string, error) {
 }
 
 // GenerateIdentificationReport generates a human-readable text report of the identification session and saves it to the path chosen by the user.
+// GenerateIdentificationReport generates a human-readable text report.
 func (a *App) GenerateIdentificationReport(req ReportRequest, path string) error {
 
 	s := getReportStrings(req.Lang)
@@ -263,7 +264,14 @@ func (a *App) GenerateIdentificationReport(req ReportRequest, path string) error
 			}
 			probStr := fmt.Sprintf("%.4f", score.Post)
 			matchSupport := fmt.Sprintf("%d/%d", score.Match, score.Support)
-			sb.WriteString(fmt.Sprintf("%-6d %-40s %-15s %-12d %-10s\n", i+1, score.Taxon.Name, probStr, score.Conflicts, matchSupport))
+
+			// CORRECTED: Format scientific name with asterisks for italics
+			formattedName := fmt.Sprintf("*%s %s*", score.Taxon.Genus, score.Taxon.Species)
+			if score.Taxon.Subspecies != "" {
+				formattedName += fmt.Sprintf(" *%s*", score.Taxon.Subspecies)
+			}
+
+			sb.WriteString(fmt.Sprintf("%-6d %-40s %-15s %-12d %-10s\n", i+1, formattedName, probStr, score.Conflicts, matchSupport))
 		}
 	}
 	sb.WriteString("\n")
@@ -329,9 +337,10 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 	for _, t := range a.currentMatrix.Traits {
 		traitMap[t.ID] = t
 		if t.Type == "nominal_parent" {
-			parentTraits[t.Name] = t
+			parentTraits[t.NameEN] = t // Using NameEN as key
 		}
 		if t.Parent != "" {
+			// Using Parent TraitID as key
 			childrenMap[t.Parent] = append(childrenMap[t.Parent], t)
 		}
 	}
@@ -362,7 +371,7 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 		if _, ok := allSelections[trait.ID]; ok {
 			isSelected = true
 		} else if trait.Type == "nominal_parent" {
-			for _, child := range childrenMap[trait.Name] {
+			for _, child := range childrenMap[trait.TraitID] {
 				if _, ok := allSelections[child.ID]; ok {
 					isSelected = true
 					break
@@ -372,8 +381,8 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 
 		if !isSelected {
 			justification.Unobserved = append(justification.Unobserved, JustificationItem{
-				TraitName:      trait.Name,
-				TraitGroupName: trait.Group,
+				TraitName:      trait.NameEN,
+				TraitGroupName: trait.GroupEN,
 				Status:         "unobserved",
 			})
 			continue
@@ -430,7 +439,7 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 
 		case "nominal_parent":
 			var chosenChild engine.Trait
-			for _, child := range childrenMap[trait.Name] {
+			for _, child := range childrenMap[trait.TraitID] {
 				if val, ok := selected[child.ID]; ok && val == 1 {
 					chosenChild = child
 					break
@@ -439,7 +448,7 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 			userChoiceStr = chosenChild.State
 
 			var taxonChildState engine.Trait
-			for _, child := range childrenMap[trait.Name] {
+			for _, child := range childrenMap[trait.TraitID] {
 				if val, ok := targetTaxon.Traits[child.ID]; ok && val == 1 {
 					taxonChildState = child
 					break
@@ -460,8 +469,8 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 		}
 
 		item := JustificationItem{
-			TraitName:      trait.Name,
-			TraitGroupName: trait.Group,
+			TraitName:      trait.NameEN,
+			TraitGroupName: trait.GroupEN,
 			UserChoice:     userChoiceStr,
 			TaxonState:     taxonStateStr,
 			Status:         status,
@@ -496,7 +505,6 @@ func ternaryToString(t engine.Ternary) string {
 }
 
 // hasIntersection checks if there is at least one common element.
-// This is a local copy from the engine package to avoid cyclic dependencies or unnecessary exports.
 func hasIntersection(set1, set2 []string) bool {
 	map1 := make(map[string]struct{}, len(set1))
 	for _, item := range set1 {

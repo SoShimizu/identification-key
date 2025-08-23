@@ -31,12 +31,27 @@ export namespace engine {
 	export class Taxon {
 	    id: string;
 	    name: string;
+	    scientificName: string;
+	    taxonAuthor?: string;
+	    vernacularName_en?: string;
+	    vernacularName_ja?: string;
+	    description_en?: string;
+	    description_ja?: string;
+	    images?: string[];
+	    references?: string;
 	    traits: Record<string, number>;
 	    continuousTraits: Record<string, ContinuousValue>;
 	    categoricalTraits: Record<string, Array<string>>;
-	    description?: string;
-	    references?: string;
-	    images?: string[];
+	    order?: string;
+	    superfamily?: string;
+	    family?: string;
+	    subfamily?: string;
+	    tribe?: string;
+	    subtribe?: string;
+	    genus?: string;
+	    subgenus?: string;
+	    species?: string;
+	    subspecies?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Taxon(source);
@@ -46,12 +61,27 @@ export namespace engine {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.scientificName = source["scientificName"];
+	        this.taxonAuthor = source["taxonAuthor"];
+	        this.vernacularName_en = source["vernacularName_en"];
+	        this.vernacularName_ja = source["vernacularName_ja"];
+	        this.description_en = source["description_en"];
+	        this.description_ja = source["description_ja"];
+	        this.images = source["images"];
+	        this.references = source["references"];
 	        this.traits = source["traits"];
 	        this.continuousTraits = this.convertValues(source["continuousTraits"], ContinuousValue, true);
 	        this.categoricalTraits = source["categoricalTraits"];
-	        this.description = source["description"];
-	        this.references = source["references"];
-	        this.images = source["images"];
+	        this.order = source["order"];
+	        this.superfamily = source["superfamily"];
+	        this.family = source["family"];
+	        this.subfamily = source["subfamily"];
+	        this.tribe = source["tribe"];
+	        this.subtribe = source["subtribe"];
+	        this.genus = source["genus"];
+	        this.subgenus = source["subgenus"];
+	        this.species = source["species"];
+	        this.subspecies = source["subspecies"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -75,15 +105,19 @@ export namespace engine {
 	export class Trait {
 	    id: string;
 	    traitId?: string;
-	    name: string;
-	    group: string;
+	    name_en: string;
+	    name_jp: string;
+	    group_en: string;
+	    group_jp: string;
 	    type: string;
 	    parent?: string;
+	    parentName?: string;
 	    parentDependency?: Dependency;
 	    state?: string;
 	    difficulty?: number;
 	    risk?: number;
-	    helpText?: string;
+	    helpText_en?: string;
+	    helpText_jp?: string;
 	    helpImages?: string[];
 	    minValue?: number;
 	    maxValue?: number;
@@ -98,15 +132,19 @@ export namespace engine {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.traitId = source["traitId"];
-	        this.name = source["name"];
-	        this.group = source["group"];
+	        this.name_en = source["name_en"];
+	        this.name_jp = source["name_jp"];
+	        this.group_en = source["group_en"];
+	        this.group_jp = source["group_jp"];
 	        this.type = source["type"];
 	        this.parent = source["parent"];
+	        this.parentName = source["parentName"];
 	        this.parentDependency = this.convertValues(source["parentDependency"], Dependency);
 	        this.state = source["state"];
 	        this.difficulty = source["difficulty"];
 	        this.risk = source["risk"];
-	        this.helpText = source["helpText"];
+	        this.helpText_en = source["helpText_en"];
+	        this.helpText_jp = source["helpText_jp"];
 	        this.helpImages = source["helpImages"];
 	        this.minValue = source["minValue"];
 	        this.maxValue = source["maxValue"];
@@ -132,8 +170,45 @@ export namespace engine {
 		    return a;
 		}
 	}
+	export class MatrixInfo {
+	    title_en: string;
+	    title_jp: string;
+	    version: string;
+	    description_en: string;
+	    description_jp: string;
+	    authors_en: string;
+	    authors_jp: string;
+	    contact_en: string;
+	    contact_jp: string;
+	    citation_en: string;
+	    citation_jp: string;
+	    references_en: string;
+	    references_jp: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MatrixInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title_en = source["title_en"];
+	        this.title_jp = source["title_jp"];
+	        this.version = source["version"];
+	        this.description_en = source["description_en"];
+	        this.description_jp = source["description_jp"];
+	        this.authors_en = source["authors_en"];
+	        this.authors_jp = source["authors_jp"];
+	        this.contact_en = source["contact_en"];
+	        this.contact_jp = source["contact_jp"];
+	        this.citation_en = source["citation_en"];
+	        this.citation_jp = source["citation_jp"];
+	        this.references_en = source["references_en"];
+	        this.references_jp = source["references_jp"];
+	    }
+	}
 	export class Matrix {
 	    name: string;
+	    info: MatrixInfo;
 	    traits: Trait[];
 	    taxa: Taxon[];
 	
@@ -144,6 +219,7 @@ export namespace engine {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.info = this.convertValues(source["info"], MatrixInfo);
 	        this.traits = this.convertValues(source["traits"], Trait);
 	        this.taxa = this.convertValues(source["taxa"], Taxon);
 	    }
@@ -166,6 +242,7 @@ export namespace engine {
 		    return a;
 		}
 	}
+	
 	export class StateProb {
 	    state: string;
 	    p: number;

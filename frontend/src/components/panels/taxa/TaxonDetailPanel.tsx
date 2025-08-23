@@ -1,9 +1,9 @@
 // frontend/src/components/panels/taxa/TaxonDetailPanel.tsx
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress, Paper, Stack, Modal, IconButton, Tabs, Tab, Grid, Divider } from '@mui/material';
+import { Box, Typography, CircularProgress, Paper, Grid, Modal, IconButton, Tabs, Tab, Divider, List, ListItem, ListItemText, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Taxon } from '../../../api';
-import { GetHelpImage } from '../../../../wailsjs/go/main/App';
+import { GetHelpImage } from '../../../../wailsjs/go/main/App.js';
 
 const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ filename, onClick }) => {
     const [imageData, setImageData] = useState<string | null>(null);
@@ -12,11 +12,15 @@ const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ 
     useEffect(() => {
         setLoading(true);
         setImageData(null);
-        GetHelpImage(filename)
-            .then((base64Data: string) => {
-                if (base64Data) setImageData(`data:image/png;base64,${base64Data}`);
-            })
-            .finally(() => setLoading(false));
+        if (filename) {
+            GetHelpImage(filename)
+                .then((base64Data: string) => {
+                    if (base64Data) setImageData(`data:image/png;base64,${base64Data}`);
+                })
+                .finally(() => setLoading(false));
+        } else {
+            setLoading(false);
+        }
     }, [filename]);
 
     if (loading) return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, width: '100%', bgcolor: 'action.hover', borderRadius: 1 }}><CircularProgress size={24} /></Box>;
@@ -29,20 +33,48 @@ const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ 
     );
 };
 
-// Component to safely render HTML content with left alignment
 const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
     return <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, textAlign: 'left' }} dangerouslySetInnerHTML={{ __html: content }} />;
 };
 
+// Reusable component for displaying taxon names correctly
+export const FormattedScientificName: React.FC<{ taxon: Taxon, lang: 'ja' | 'en' }> = ({ taxon, lang }) => {
+    const genus = taxon.genus || '';
+    const subgenus = taxon.subgenus ? `(${taxon.subgenus})` : '';
+    const species = taxon.species || '';
+    const subspecies = taxon.subspecies || '';
+    
+    const vernacularName = lang === 'ja' ? taxon.vernacularName_ja || taxon.vernacularName_en : taxon.vernacularName_en || taxon.vernacularName_ja;
 
-export default function TaxonDetailPanel({ taxon }: { taxon: Taxon }) {
+    const nameParts = [genus, subgenus, species, subspecies].filter(Boolean);
+    const scientificNameMain = nameParts.map((part, index) => (
+        <i key={index} style={{marginRight: '0.25em'}}>{part}</i>
+    ));
+
+    return (
+        <Box>
+            <Typography variant="body1" component="div" sx={{ fontStyle: 'italic', display: 'inline-block' }}>
+                {scientificNameMain}
+            </Typography>
+            {taxon.taxonAuthor && <Typography variant="body2" component="span" sx={{ ml: 1 }}>{taxon.taxonAuthor}</Typography>}
+            {vernacularName && <Typography variant="caption" color="text.secondary" sx={{display: 'block'}}>{vernacularName}</Typography>}
+        </Box>
+    );
+};
+
+
+export default function TaxonDetailPanel({ taxon, lang }: { taxon: Taxon, lang: "ja" | "en" }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImage, setModalImage] = useState<string | null>(null);
   
+  const description = lang === 'ja' ? taxon.description_jp || taxon.description_en : taxon.description_en || taxon.description_jp;
+  const references = taxon.references;
+  
   const tabs = [];
-  if (taxon.description) tabs.push("Description");
-  if (taxon.references) tabs.push("References");
-  if (taxon.images && taxon.images.length > 0) tabs.push("Images");
+  if (description) tabs.push(lang === 'ja' ? "解説" : "Description");
+  tabs.push(lang === 'ja' ? "分類" : "Taxonomy");
+  if (references) tabs.push(lang === 'ja' ? "文献" : "References");
+  if (taxon.images && taxon.images.length > 0 && taxon.images.filter(img => img.trim() !== "").length > 0) tabs.push(lang === 'ja' ? "画像" : "Images");
 
   const [activeTab, setActiveTab] = useState(0);
 
@@ -60,40 +92,56 @@ export default function TaxonDetailPanel({ taxon }: { taxon: Taxon }) {
     });
   };
   
-  const hasContent = tabs.length > 0;
+  const ranks = [
+      { label: 'Order', value: taxon.order },
+      { label: 'Superfamily', value: taxon.superfamily },
+      { label: 'Family', value: taxon.family },
+      { label: 'Subfamily', value: taxon.subfamily },
+      { label: 'Tribe', value: taxon.tribe },
+      { label: 'Subtribe', value: taxon.subtribe },
+      { label: 'Genus', value: taxon.genus },
+      { label: 'Subgenus', value: taxon.subgenus },
+      { label: 'Species', value: taxon.species },
+      { label: 'Subspecies', value: taxon.subspecies },
+  ].filter(rank => rank.value);
+
 
   return (
     <>
       <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" component="h3" sx={{ flexShrink: 0 }}>{taxon.name}</Typography>
+        <Box sx={{flexShrink: 0}}>
+            <FormattedScientificName taxon={taxon} lang={lang} />
+        </Box>
         <Divider sx={{ my: 1, flexShrink: 0 }} />
         
-        {!hasContent ? (
-            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                 <Typography color="text.secondary">No detailed information available for this taxon.</Typography>
-            </Box>
-        ) : (
-            <>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
-                    <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} variant="fullWidth">
-                       {tabs.map(label => <Tab key={label} label={label} />)}
-                    </Tabs>
-                </Box>
-                <Box sx={{ flex: 1, overflowY: 'auto', pt: 2 }}>
-                    {tabs[activeTab] === "Description" && <HtmlRenderer content={taxon.description || ''} />}
-                    {tabs[activeTab] === "References" && <HtmlRenderer content={taxon.references || ''} />}
-                    {tabs[activeTab] === "Images" && taxon.images && (
-                         <Grid container spacing={2}>
-                            {taxon.images.map(filename => (
-                                <Grid item xs={12} sm={6} md={4} key={filename}>
-                                    <ImageWithLoader filename={filename} onClick={() => handleImageClick(filename)} />
-                                </Grid>
-                            ))}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
+            <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} variant="scrollable" scrollButtons="auto" aria-label="taxon detail tabs">
+                {tabs.map(label => <Tab key={label} label={label} />)}
+            </Tabs>
+        </Box>
+        <Box sx={{ flex: 1, overflowY: 'auto', pt: 2 }}>
+            {tabs[activeTab] === (lang === 'ja' ? "解説" : "Description") && <HtmlRenderer content={description || ''} />}
+            {tabs[activeTab] === (lang === 'ja' ? "分類" : "Taxonomy") && (
+                <List dense>
+                    {ranks.map(rank => (
+                        <ListItem key={rank.label} sx={{py: 0.5}}>
+                            <Chip label={rank.label} size="small" sx={{mr: 2, minWidth: '90px'}}/>
+                            <ListItemText primaryTypographyProps={{ sx: { fontStyle: ['Genus', 'Subgenus', 'Species', 'Subspecies'].includes(rank.label) ? 'italic' : 'normal' } }} primary={rank.value} />
+                        </ListItem>
+                    ))}
+                </List>
+            )}
+            {tabs[activeTab] === (lang === 'ja' ? "文献" : "References") && <HtmlRenderer content={references || ''} />}
+            {tabs[activeTab] === (lang === 'ja' ? "画像" : "Images") && taxon.images && (
+                    <Grid container spacing={2}>
+                    {taxon.images.filter(f => f.trim() !== "").map(filename => (
+                        <Grid item xs={12} sm={6} md={4} key={filename}>
+                            <ImageWithLoader filename={filename} onClick={() => handleImageClick(filename)} />
                         </Grid>
-                    )}
-                </Box>
-            </>
-        )}
+                    ))}
+                </Grid>
+            )}
+        </Box>
       </Paper>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ position: 'relative', maxHeight: '90vh', maxWidth: '90vw' }}>

@@ -44,7 +44,7 @@ func getTraitMetaMap(traits []Trait) map[string]Trait {
 	}
 	for _, t := range traits {
 		if t.Type != "derived" {
-			metaMap[t.Name] = t
+			metaMap[t.NameEN] = t
 		}
 	}
 	return metaMap
@@ -63,14 +63,14 @@ func buildStateDefs(m *Matrix) []stateDef {
 		if strings.EqualFold(t.Type, "derived") {
 			continue
 		}
-		kids := append([]Trait{}, childrenByParent[t.ID]...)
-		kids = append(kids, childrenByParent[t.Name]...)
+		kids := append([]Trait{}, childrenByParent[t.TraitID]...)
+		kids = append(kids, childrenByParent[t.NameEN]...)
 		if len(kids) == 0 {
 			out = append(out, stateDef{
 				yesNo:   true,
 				traitID: t.ID,
-				name:    t.Name,
-				group:   t.Group,
+				name:    t.NameEN,
+				group:   t.GroupEN,
 			})
 		} else {
 			ids := make([]string, 0, len(kids))
@@ -79,16 +79,16 @@ func buildStateDefs(m *Matrix) []stateDef {
 				ids = append(ids, c.ID)
 				if c.State != "" {
 					lb = append(lb, c.State)
-				} else if c.Name != "" {
-					lb = append(lb, c.Name)
+				} else if c.NameEN != "" {
+					lb = append(lb, c.NameEN)
 				} else {
 					lb = append(lb, c.ID)
 				}
 			}
 			out = append(out, stateDef{
 				traitID:  t.ID,
-				name:     t.Name,
-				group:    t.Group,
+				name:     t.NameEN,
+				group:    t.GroupEN,
 				childIDs: ids,
 				labels:   lb,
 			})

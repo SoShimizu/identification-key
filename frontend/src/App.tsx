@@ -1,66 +1,36 @@
 // frontend/src/App.tsx
-import React, { useState, useMemo } from "react";
-import { CssBaseline, ThemeProvider, createTheme, Box, Drawer, Modal } from "@mui/material";
+import React, { useState, useMemo, useEffect } from "react";
+import { CssBaseline, ThemeProvider, createTheme, Box, Drawer, Paper, Typography } from "@mui/material";
 import { useMatrix } from "./hooks/useMatrix";
 import Ribbon from "./components/header/Ribbon";
-import CandidatesPanel, { EngineScore } from "./components/panels/candidates/CandidatesPanel";
+import CandidatesPanel from "./components/panels/candidates/CandidatesPanel";
 import ComparisonPanel from "./components/panels/comparison/ComparisonPanel";
 import TraitsTabsPanel from "./components/panels/traits/TraitsTabsPanel";
-import HelpDisplay from "./components/panels/traits/HelpDisplay";
 import TaxonDetailPanel from "./components/panels/taxa/TaxonDetailPanel";
+import HelpDisplay from "./components/panels/traits/HelpDisplay";
 import { STR } from "./i18n";
 import { Choice, Taxon, Trait } from "./api";
+import MatrixInfoPanel from "./components/panels/matrix/MatrixInfoPanel";
 
 const fontLink = document.createElement('link');
 fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
 fontLink.rel = 'stylesheet';
 document.head.appendChild(fontLink);
 
-// Horizontal Resizer (for left/right panels)
 const ResizerX = ({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) => (
-    <Box
-        onMouseDown={onMouseDown}
-        sx={{
-            width: '8px',
-            cursor: 'col-resize',
-            bgcolor: 'divider',
-            transition: 'background-color 0.2s ease',
-            '&:hover': { bgcolor: 'primary.main' },
-            borderRadius: '4px',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }}
-    >
+    <Box onMouseDown={onMouseDown} sx={{ width: '8px', cursor: 'col-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{width: '2px', height: '30px', bgcolor: 'background.default', borderRadius: '1px'}} />
     </Box>
 );
-
-// Vertical Resizer (for top/bottom panels)
 const ResizerY = ({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) => (
-    <Box
-        onMouseDown={onMouseDown}
-        sx={{
-            height: '8px',
-            cursor: 'row-resize',
-            bgcolor: 'divider',
-            transition: 'background-color 0.2s ease',
-            '&:hover': { bgcolor: 'primary.main' },
-            borderRadius: '4px',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }}
-    >
+    <Box onMouseDown={onMouseDown} sx={{ height: '8px', cursor: 'row-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{height: '2px', width: '30px', bgcolor: 'background.default', borderRadius: '1px'}} />
     </Box>
 );
 
-
 export default function App() {
   const {
+    matrixInfo,
     matrixName, taxaCount, rows, traits,
     selected, selectedMulti, setBinary, setContinuous, setMulti, setMultiAsNA, setDerivedPick, clearDerived, clearAllSelections,
     scores, suggMap, sortBy, setSortBy,
@@ -68,22 +38,23 @@ export default function App() {
     opts, setOpts,
     keys, activeKey, pickKey, refreshKeys,
     history, undo, redo, canUndo, canRedo,
+    lang, setLang,
   } = useMatrix();
 
   const [themeMode, setThemeMode] = React.useState<"light" | "dark">("dark");
-  const [lang, setLang] = React.useState<"ja" | "en">("ja");
   const [comparisonList, setComparisonList] = React.useState<string[]>([]);
   const [comparisonOpen, setComparisonOpen] = React.useState(false);
   const [detailView, setDetailView] = useState<{ type: 'trait'; content: Trait } | { type: 'taxon'; content: Taxon } | null>(null);
   
-  const [leftPanelWidth, setLeftPanelWidth] = useState(60);
-  const [topPanelHeight, setTopPanelHeight] = useState(45);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(35);
+  const [leftTopPanelHeight, setLeftTopPanelHeight] = useState(40);
+  const [rightTopPanelHeight, setRightTopPanelHeight] = useState(50);
 
   const handleMouseDownX = (e: React.MouseEvent) => {
       e.preventDefault();
       const handleMouseMove = (event: MouseEvent) => {
           const newLeftWidth = (event.clientX / window.innerWidth) * 100;
-          if (newLeftWidth > 30 && newLeftWidth < 70) setLeftPanelWidth(newLeftWidth);
+          if (newLeftWidth > 20 && newLeftWidth < 80) setLeftPanelWidth(newLeftWidth);
       };
       const handleMouseUp = () => {
           window.removeEventListener('mousemove', handleMouseMove);
@@ -93,15 +64,15 @@ export default function App() {
       window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleMouseDownY = (e: React.MouseEvent) => {
+  const createVerticalResizer = (setter: React.Dispatch<React.SetStateAction<number>>) => (e: React.MouseEvent) => {
       e.preventDefault();
-      const leftPanelElement = e.currentTarget.parentElement;
-      if (!leftPanelElement) return;
+      const panelElement = e.currentTarget.parentElement;
+      if (!panelElement) return;
 
       const handleMouseMove = (event: MouseEvent) => {
-          const bounds = leftPanelElement.getBoundingClientRect();
+          const bounds = panelElement.getBoundingClientRect();
           const newTopHeight = ((event.clientY - bounds.top) / bounds.height) * 100;
-          if (newTopHeight > 20 && newTopHeight < 80) setTopPanelHeight(newTopHeight);
+          if (newTopHeight > 15 && newTopHeight < 85) setter(newTopHeight);
       };
       const handleMouseUp = () => {
           window.removeEventListener('mousemove', handleMouseMove);
@@ -115,16 +86,12 @@ export default function App() {
     return scores.map(s => s.taxon as Taxon);
   }, [scores]);
 
-  const handleTaxonSelect = (taxon: Taxon) => {
-    setDetailView({ type: 'taxon', content: taxon });
-  };
-  
   const handleTraitSelect = (trait?: Trait) => {
     if (trait) {
-      setDetailView({ type: 'trait', content: trait });
+        setDetailView({ type: 'trait', content: trait });
     }
   };
-
+  
   const T = STR[lang];
 
   const theme = React.useMemo(
@@ -151,7 +118,7 @@ export default function App() {
     [themeMode]
   );
   
-  const candRows: EngineScore[] = React.useMemo(() => {
+  const candRows = React.useMemo(() => {
     return (scores || []).map((s: any, i: number) => ({
       rank: i + 1,
       taxon: s.taxon,
@@ -162,6 +129,16 @@ export default function App() {
       match: s?.match ?? 0,
       support: s?.support ?? 0,
     }));
+  }, [scores]);
+  
+  useEffect(() => {
+      if (scores && scores.length > 0) {
+          if (detailView?.type !== 'trait') {
+              setDetailView({type: 'taxon', content: scores[0].taxon});
+          }
+      } else {
+          setDetailView(null);
+      }
   }, [scores]);
 
   return (
@@ -174,17 +151,36 @@ export default function App() {
           algo={algo} setAlgo={setAlgo}
           themeMode={themeMode} setThemeMode={setThemeMode}
           opts={opts} setOpts={setOpts}
+          matrixInfo={matrixInfo}
           matrixName={matrixName}
           history={history}
           scores={scores}
-          undo={undo}
-          redo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
         />
          <Box sx={{ flex: 1, p: 2, gap: 1, display: 'flex', flexDirection: 'row', height: 'calc(100vh - 48px)' }}>
-            <Box sx={{ width: `${leftPanelWidth}%`, display: 'flex', flexDirection: 'column', gap: 1, minHeight: 0, minWidth: '300px' }}>
-                <Box sx={{ height: `${topPanelHeight}%`, minHeight: '100px', flexShrink: 0 }}>
+            {/* Left Panel: Info */}
+            <Box sx={{ width: `${leftPanelWidth}%`, display: 'flex', flexDirection: 'column', gap: 1, minHeight: 0, minWidth: '250px' }}>
+                <Box sx={{ height: `${leftTopPanelHeight}%`, minHeight: '100px' }}>
+                    <MatrixInfoPanel info={matrixInfo} lang={lang} />
+                </Box>
+
+                <ResizerY onMouseDown={createVerticalResizer(setLeftTopPanelHeight)} />
+                
+                <Box sx={{ flex: 1, minHeight: '100px' }}>
+                    {detailView?.type === 'taxon' && <TaxonDetailPanel taxon={detailView.content} lang={lang} />}
+                    {detailView?.type === 'trait' && <HelpDisplay trait={detailView.content} lang={lang} />}
+                    {!detailView && (
+                        <Paper variant="outlined" sx={{height: '100%', p:2, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                            <Typography color="text.secondary">Select a taxon to see details or a trait to see help.</Typography>
+                        </Paper>
+                    )}
+                </Box>
+            </Box>
+
+            <ResizerX onMouseDown={handleMouseDownX} />
+
+            {/* Right Panel: Interaction */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, minHeight: 0, minWidth: '400px' }}>
+                 <Box sx={{ height: `${rightTopPanelHeight}%`, minHeight: '150px' }}>
                     <CandidatesPanel
                         lang={lang}
                         title={T.panels.candidates}
@@ -194,13 +190,13 @@ export default function App() {
                         comparisonList={comparisonList}
                         setComparisonList={setComparisonList}
                         onCompareClick={() => setComparisonOpen(true)}
-                        onTaxonSelect={handleTaxonSelect}
+                        onTaxonSelect={(taxon) => setDetailView({type: 'taxon', content: taxon})}
                         selected={selected}
                         selectedMulti={selectedMulti}
                     />
                 </Box>
                 
-                <ResizerY onMouseDown={handleMouseDownY} />
+                <ResizerY onMouseDown={createVerticalResizer(setRightTopPanelHeight)} />
 
                 <Box sx={{ flex: 1, minHeight: '100px' }}>
                     <TraitsTabsPanel
@@ -221,18 +217,12 @@ export default function App() {
                         onTraitSelect={handleTraitSelect}
                         opts={opts}
                         setOpts={setOpts}
+                        undo={undo}
+                        redo={redo}
+                        canUndo={canUndo}
+                        canRedo={canRedo}
                     />
                 </Box>
-            </Box>
-            
-            <ResizerX onMouseDown={handleMouseDownX} />
-
-            <Box sx={{ flex: 1, minHeight: 0, minWidth: '200px' }}>
-                 {detailView?.type === 'taxon' ? (
-                    <TaxonDetailPanel taxon={detailView.content} />
-                ) : (
-                    <HelpDisplay trait={detailView?.type === 'trait' ? detailView.content : undefined} lang={lang} />
-                )}
             </Box>
         </Box>
         <Drawer

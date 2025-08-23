@@ -2,48 +2,82 @@
 import { engine, main } from "../wailsjs/go/models";
 import { GetMatrix, GetTaxonDetails } from "../wailsjs/go/main/App";
 
-// For binary traits, -1, 0, 1. For continuous, the float value.
-// For categorical multi, it's a bitmask or similar, but we'll use a string array for the selection state.
 export type Choice = number;
 export type MultiChoice = string[];
 
-// NEW: Define the structure for a dependency rule
 export type Dependency = {
     parentTraitId: string;
     requiredState: string;
-    requiredTernary: number;
-    isBinary: boolean;
 };
 
-// Goの `engine.Trait` 構造体と型を一致させる
+export type MatrixInfo = {
+    title_en: string;
+    title_jp: string;
+    version: string;
+    description_en: string;
+    description_jp: string;
+    authors_en: string;
+    authors_jp: string;
+    contact_en: string;
+    contact_jp: string;
+    citation_en: string;
+    citation_jp: string;
+    references_en: string;
+    references_jp: string;
+}
+
 export type Trait = {
   id: string;
-  traitId?: string; // User-defined ID
-  name: string;
-  group: string;
+  traitId?: string;
+  name_en: string;
+  name_jp: string;
+  group_en: string;
+  group_jp: string;
   type: "binary" | "derived" | "nominal_parent" | "continuous" | "categorical_multi";
-  parent?: string; // For derived traits
-  parentDependency?: Dependency; // NEW: For dependency rules
+  parent?: string;
+  parentName?: string;
+  parentDependency?: Dependency;
   state?: string;
   difficulty?: number;
   risk?: number;
-  helpText?: string;
+  helpText_en?: string;
+  helpText_jp?: string;
   helpImages?: string[];
   minValue?: number;
   maxValue?: number;
   isInteger?: boolean;
-  states?: string[]; // For categorical_multi
+  states?: string[];
 };
 
-// Extend Taxon type to include new fields
-export type Taxon = engine.Taxon & {
-    description?: string;
-    references?: string;
+export type Taxon = {
+    id: string;
+    name: string;
+    scientificName: string;
+    taxonAuthor?: string;
+    vernacularName_en?: string;
+    vernacularName_ja?: string;
+    description_en?: string;
+    description_jp?: string;
     images?: string[];
+    references?: string;
+    order?: string;
+    superfamily?: string;
+    family?: string;
+    subfamily?: string;
+    tribe?: string;
+    subtribe?: string;
+    genus?: string;
+    subgenus?: string;
+    species?: string;
+    subspecies?: string;
+    traits?: Record<string, number>;
+    continuousTraits?: Record<string, {min: number, max: number}>;
+    categoricalTraits?: Record<string, string[]>;
 };
 
 export type Matrix = {
   name: string;
+  info: MatrixInfo;
   traits: Trait[];
   taxa: Taxon[];
 };
@@ -57,8 +91,6 @@ export type ApplyOptions = main.ApplyOptions;
 export type ApplyResult = main.ApplyResultEx;
 export type ReportRequest = main.ReportRequest;
 
-
-// NEW: Types for Justification ("Why?" feature)
 export type JustificationItem = {
     traitName: string;
     traitGroupName: string;
@@ -75,15 +107,11 @@ export type Justification = {
     conflictCount: number;
 }
 
-// NEW: Type for history items for report generation
 export type HistoryItem = {
     traitName: string;
     selection: string;
     timestamp: number;
 }
-
-
-// ---- Wails バインディング呼び出し ----
 
 export async function getMatrix(): Promise<Matrix> {
   const m = await GetMatrix();

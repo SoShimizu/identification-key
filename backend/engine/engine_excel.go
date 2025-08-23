@@ -15,59 +15,8 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// Regex to parse parent dependency string like T001[note]="Yes" or T002=orange
-// This regex correctly ignores optional bracketed text to extract the core TraitID.
-var reParentDependency = regexp.MustCompile(`^([a-zA-Z0-9_]+)(?:\[.*?\])?\s*=\s*(?:"([^"]+)"|([^"\s=]+))$`)
-
-// Regex to normalize a TraitID by removing any bracketed notes, e.g., "FW01[note]" -> "FW01"
+var reParentDependency = regexp.MustCompile(`^([a-zA-Z0-9_.-]+)(?:\[.*?\])?\s*=\s*(?:"([^"]+)"|([^"\s=]+))$`)
 var reNormalizeTraitID = regexp.MustCompile(`^[^\[]+`)
-
-// Helper function to parse the #Dependency column.
-// It extracts the parent TraitID and the required state.
-func parseParentDependency(s string) *Dependency {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil
-	}
-
-	matches := reParentDependency.FindStringSubmatch(s)
-	// Successful match will have 4 elements: the full string, group 1 (ID), group 2 (quoted state), group 3 (unquoted state)
-	if len(matches) != 4 {
-		log.Printf("[EXCEL PARSER] Invalid dependency format: %s", s)
-		return nil
-	}
-
-	requiredState := matches[2] // Assume quoted state first
-	if requiredState == "" {
-		requiredState = matches[3] // Fallback to unquoted state
-	}
-
-	dep := &Dependency{
-		ParentTraitID: matches[1],
-		RequiredState: requiredState,
-	}
-
-	return dep
-}
-
-// Helper function to normalize a TraitID by removing bracketed notes.
-func normalizeTraitID(id string) string {
-	trimmedID := strings.TrimSpace(id)
-	if match := reNormalizeTraitID.FindString(trimmedID); match != "" {
-		return strings.TrimSpace(match)
-	}
-	return trimmedID
-}
-
-type LoadSummary struct {
-	Dir         string `json:"dir"`
-	Traits      int    `json:"traits"`
-	Taxa        int    `json:"taxa"`
-	FilesParsed int    `json:"filesParsed"`
-	Conflicts   int    `json:"conflicts"`
-}
-
-var reFullWidthDigit = regexp.MustCompile(`[０-９－]+`)
 var whitespaceReplacer = strings.NewReplacer("\u00A0", " ", "\t", " ", "　", " ")
 
 func cleanString(s string) string {
@@ -76,14 +25,44 @@ func cleanString(s string) string {
 	return strings.TrimSpace(s)
 }
 
+func parseParentDependency(s string) *Dependency {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	matches := reParentDependency.FindStringSubmatch(s)
+	if len(matches) != 4 {
+		log.Printf("[EXCEL PARSER] Invalid dependency format: %s", s)
+		return nil
+	}
+	requiredState := matches[2]
+	if requiredState == "" {
+		requiredState = matches[3]
+	}
+	return &Dependency{ParentTraitID: matches[1], RequiredState: requiredState}
+}
+
+func normalizeTraitID(id string) string {
+	trimmedID := strings.TrimSpace(id)
+	if match := reNormalizeTraitID.FindString(trimmedID); match != "" {
+		return strings.TrimSpace(match)
+	}
+	return trimmedID
+}
+
+func sanitizeToID(s string) string {
+	s = strings.ToLower(s)
+	s = regexp.MustCompile(`[\s/\\,.;:'"]+`).ReplaceAllString(s, "_")
+	s = regexp.MustCompile(`[^a-z0-9_-]+`).ReplaceAllString(s, "")
+	return s
+}
+
 func parseRange(s string) (ContinuousValue, bool) {
 	s = cleanString(s)
 	s = strings.ReplaceAll(s, ",", "")
-
 	if s == "" {
 		return ContinuousValue{}, false
 	}
-
 	parts := strings.Split(s, "-")
 	if len(parts) == 1 {
 		val, err := strconv.ParseFloat(parts[0], 64)
@@ -102,7 +81,6 @@ func parseRange(s string) (ContinuousValue, bool) {
 		}
 		return ContinuousValue{Min: min, Max: max}, true
 	}
-
 	return ContinuousValue{}, false
 }
 
@@ -171,13 +149,6 @@ func parseRisk(s string) float64 {
 	}
 }
 
-func getRawCell(rows [][]string, r, c int) string {
-	if c < 0 || r < 0 || r >= len(rows) || c >= len(rows[r]) {
-		return ""
-	}
-	return rows[r][c]
-}
-
 type traitKind int
 
 const (
@@ -209,7 +180,6 @@ func parseStateList(s string) []string {
 	}
 	return out
 }
-
 func parseStateListOrdered(s string) []string {
 	s = cleanString(s)
 	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
@@ -226,7 +196,6 @@ func parseStateListOrdered(s string) []string {
 	}
 	return out
 }
-
 func parseTypeSpec(s string) typeSpec {
 	x := strings.ToLower(cleanString(s))
 	if x == "" || x == "binary" {
@@ -248,8 +217,21 @@ func parseTypeSpec(s string) typeSpec {
 	}
 	return typeSpec{kind: kindBinary}
 }
+func getCell(rows [][]string, r, c int) string {
+	if c < 0 || r < 0 || r >= len(rows) || c >= len(rows[r]) {
+		return ""
+	}
+	return rows[r][c]
+}
+func getHeaderMap(header []string) map[string]int {
+	m := make(map[string]int)
+	for i, h := range header {
+		m[strings.ToLower(cleanString(h))] = i
+	}
+	return m
+}
 
-func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
+func LoadMatrixExcel(path string) (*Matrix, error) {
 	log.Printf("[EXCEL PARSER] Starting to load matrix from: %s", path)
 	f, err := excelize.OpenFile(path)
 	if err != nil {
@@ -257,104 +239,210 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 	}
 	defer f.Close()
 
-	sheet := f.WorkBook.Sheets.Sheet[0].Name
-	rows, err := f.GetRows(sheet)
-	if err != nil || len(rows) < 2 || len(rows[0]) < 1 {
-		return nil, errors.New("invalid matrix: need header row and at least one trait")
+	matrix := &Matrix{Name: filepath.Base(path)}
+
+	if err := parseMatrixInfo(f, matrix); err != nil {
+		return nil, fmt.Errorf("error parsing MatrixInfo sheet: %w", err)
 	}
 
-	header := rows[0]
-	if len(header) > 0 {
-		header[0] = strings.TrimPrefix(header[0], "\ufeff")
+	taxaMap, err := parseTaxaInfo(f)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing TaxaInfo sheet: %w", err)
 	}
 
-	colIdxGroup, colIdxTrait, colIdxType, colIdxTraitID, colIdxDifficulty, colIdxRisk, colIdxParent, colIdxDependency, colIdxHelpText, colIdxHelpImage := -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+	if err := parseTraits(f, matrix, taxaMap); err != nil {
+		return nil, fmt.Errorf("error parsing Traits sheet: %w", err)
+	}
 
-	taxonNames, taxonCols := []string{}, []int{}
-	for i, h := range header {
-		cleanHeader := strings.ToLower(cleanString(h))
-		if strings.HasPrefix(cleanHeader, "#") {
-			switch cleanHeader {
-			case "#group":
-				colIdxGroup = i
-			case "#trait":
-				colIdxTrait = i
-			case "#type":
-				colIdxType = i
-			case "#traitid":
-				colIdxTraitID = i
-			case "#difficulty":
-				colIdxDifficulty = i
-			case "#risk":
-				colIdxRisk = i
-			case "#parent":
-				colIdxParent = i
-			case "#dependency":
-				colIdxDependency = i
-			case "#helptext":
-				colIdxHelpText = i
-			case "#helpimages":
-				colIdxHelpImage = i
-			}
-		} else if cleanHeader != "" {
-			taxonNames = append(taxonNames, cleanString(h))
-			taxonCols = append(taxonCols, i)
+	matrix.Taxa = make([]Taxon, 0, len(taxaMap))
+	for _, taxon := range taxaMap {
+		matrix.Taxa = append(matrix.Taxa, *taxon)
+	}
+	sort.Slice(matrix.Taxa, func(i, j int) bool {
+		return matrix.Taxa[i].ScientificName < matrix.Taxa[j].ScientificName
+	})
+
+	log.Printf("[EXCEL PARSER] Successfully loaded matrix. Traits: %d, Taxa: %d", len(matrix.Traits), len(matrix.Taxa))
+	if len(matrix.Traits) == 0 || len(matrix.Taxa) == 0 {
+		return matrix, errors.New("parsed zero traits or taxa")
+	}
+
+	return matrix, nil
+}
+
+func parseMatrixInfo(f *excelize.File, matrix *Matrix) error {
+	rows, err := f.GetRows("MatrixInfo")
+	if err != nil {
+		return errors.New("'MatrixInfo' sheet not found or unreadable")
+	}
+	infoMap := make(map[string]string)
+	for _, row := range rows {
+		if len(row) >= 2 {
+			key := strings.ToLower(cleanString(row[0]))
+			infoMap[key] = row[1]
 		}
 	}
-
-	if colIdxTrait == -1 {
-		return nil, errors.New("header must contain '#Trait' column")
+	matrix.Info = MatrixInfo{
+		TitleEN:       infoMap["title_en"],
+		TitleJP:       infoMap["title_jp"],
+		Version:       infoMap["version"],
+		DescriptionEN: infoMap["description_en"],
+		DescriptionJP: infoMap["description_jp"],
+		AuthorsEN:     infoMap["authors_en"],
+		AuthorsJP:     infoMap["authors_jp"],
+		ContactEN:     infoMap["contact_en"],
+		ContactJP:     infoMap["contact_jp"],
+		CitationEN:    infoMap["citation_en"],
+		CitationJP:    infoMap["citation_jp"],
+		ReferencesEN:  infoMap["references_en"],
+		ReferencesJP:  infoMap["references_jp"],
 	}
-	if len(taxonNames) == 0 {
-		return nil, errors.New("no taxa found in header")
-	}
-	log.Printf("[EXCEL PARSER] Found %d taxa.", len(taxonNames))
+	return nil
+}
 
-	m.Name, m.Traits, m.Taxa = filepath.Base(path), []Trait{}, []Taxon{}
-	taxonIndex := map[string]int{}
-	for i, nm := range taxonNames {
-		m.Taxa = append(m.Taxa, Taxon{
-			ID: nm, Name: nm,
-			Traits:            make(map[string]Ternary),
-			ContinuousTraits:  make(map[string]ContinuousValue),
-			CategoricalTraits: make(map[string][]string),
-		})
-		taxonIndex[nm] = i
+func parseTaxaInfo(f *excelize.File) (map[string]*Taxon, error) {
+	rows, err := f.GetRows("TaxaInfo")
+	if err != nil || len(rows) < 1 {
+		return nil, errors.New("'TaxaInfo' sheet not found or has no header")
+	}
+
+	header := getHeaderMap(rows[0])
+	taxaMap := make(map[string]*Taxon)
+
+	col, ok := header["#taxonid"]
+	if !ok {
+		return nil, errors.New("#TaxonID column not found in TaxaInfo sheet")
 	}
 
 	for r := 1; r < len(rows); r++ {
-		traitName := cleanString(getRawCell(rows, r, colIdxTrait))
-		if traitName == "" {
+		taxonID := cleanString(getCell(rows, r, col))
+		if taxonID == "" {
 			continue
 		}
 
-		group := cleanString(getRawCell(rows, r, colIdxGroup))
-		spec := parseTypeSpec(cleanString(getRawCell(rows, r, colIdxType)))
+		name := cleanString(getCell(rows, r, header["#scientificname"]))
+		taxaMap[taxonID] = &Taxon{
+			ID:                taxonID,
+			Name:              name,
+			ScientificName:    name,
+			TaxonAuthor:       cleanString(getCell(rows, r, header["#author"])),
+			VernacularNameEN:  cleanString(getCell(rows, r, header["#vernacularname_en"])),
+			VernacularNameJP:  cleanString(getCell(rows, r, header["#vernacularname_ja"])),
+			DescriptionEN:     getCell(rows, r, header["#description_en"]),
+			DescriptionJP:     getCell(rows, r, header["#description_ja"]),
+			Images:            strings.Split(cleanString(getCell(rows, r, header["#images"])), ","),
+			References:        getCell(rows, r, header["#references"]),
+			Order:             cleanString(getCell(rows, r, header["#order"])),
+			Superfamily:       cleanString(getCell(rows, r, header["#superfamily"])),
+			Family:            cleanString(getCell(rows, r, header["#family"])),
+			Subfamily:         cleanString(getCell(rows, r, header["#subfamily"])),
+			Tribe:             cleanString(getCell(rows, r, header["#tribe"])),
+			Subtribe:          cleanString(getCell(rows, r, header["#subtribe"])),
+			Genus:             cleanString(getCell(rows, r, header["#genus"])),
+			Subgenus:          cleanString(getCell(rows, r, header["#subgenus"])),
+			Species:           cleanString(getCell(rows, r, header["#species"])),
+			Subspecies:        cleanString(getCell(rows, r, header["#subspecies"])),
+			Traits:            make(map[string]Ternary),
+			ContinuousTraits:  make(map[string]ContinuousValue),
+			CategoricalTraits: make(map[string][]string),
+		}
+	}
+	return taxaMap, nil
+}
 
-		// Normalizes the TraitID by removing bracketed notes. This is the key fix.
-		traitIDStr := normalizeTraitID(getRawCell(rows, r, colIdxTraitID))
+func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) error {
+	rows, err := f.GetRows("Traits")
+	if err != nil || len(rows) < 1 {
+		return errors.New("'Traits' sheet not found or has no header")
+	}
 
-		dependency := parseParentDependency(cleanString(getRawCell(rows, r, colIdxDependency)))
-		difficultyVal := parseDifficulty(cleanString(getRawCell(rows, r, colIdxDifficulty)))
-		riskVal := parseRisk(cleanString(getRawCell(rows, r, colIdxRisk)))
-		parentName := cleanString(getRawCell(rows, r, colIdxParent))
-		helpText := getRawCell(rows, r, colIdxHelpText)
-		helpImageStr := cleanString(getRawCell(rows, r, colIdxHelpImage))
-		var helpImages []string
-		if helpImageStr != "" {
-			helpImages = regexp.MustCompile(`\s*[,;]\s*`).Split(helpImageStr, -1)
+	headerMap := getHeaderMap(rows[0])
+
+	requiredHeaders := []string{"#trait_en", "#type"}
+	for _, h := range requiredHeaders {
+		if _, ok := headerMap[h]; !ok {
+			return fmt.Errorf("required header '%s' not found in Traits sheet", h)
+		}
+	}
+
+	taxonIDs := make([]string, 0, len(taxaMap))
+	taxonCols := make([]int, 0, len(taxaMap))
+	for i, h := range rows[0] {
+		cleanedHeader := cleanString(h)
+		if _, ok := taxaMap[cleanedHeader]; ok {
+			taxonIDs = append(taxonIDs, cleanedHeader)
+			taxonCols = append(taxonCols, i)
+		}
+	}
+	if len(taxonIDs) == 0 {
+		return errors.New("no matching taxonIDs found between Traits header and TaxaInfo sheet")
+	}
+
+	// --- 1st Pass: Build lookup maps for dependency resolution ---
+	nameEnToTraitId := make(map[string]string)
+	for r := 1; r < len(rows); r++ {
+		traitNameEN := cleanString(getCell(rows, r, headerMap["#trait_en"]))
+		if traitNameEN == "" {
+			continue
+		}
+		traitID := cleanString(getCell(rows, r, headerMap["#traitid"]))
+		if traitID == "" {
+			traitID = sanitizeToID(traitNameEN)
+		}
+		nameEnToTraitId[traitNameEN] = traitID
+		nameEnToTraitId[sanitizeToID(traitNameEN)] = traitID
+	}
+
+	// --- 2nd Pass: Process traits and resolve dependencies ---
+	for r := 1; r < len(rows); r++ {
+		traitNameEN := cleanString(getCell(rows, r, headerMap["#trait_en"]))
+		if traitNameEN == "" {
+			continue
+		}
+
+		traitID := cleanString(getCell(rows, r, headerMap["#traitid"]))
+		if traitID == "" {
+			traitID = sanitizeToID(traitNameEN)
+		}
+
+		var dependency *Dependency
+		depStr := cleanString(getCell(rows, r, headerMap["#dependency"]))
+		if depStr != "" {
+			dep := parseParentDependency(depStr)
+			if dep != nil {
+				if resolvedId, ok := nameEnToTraitId[dep.ParentTraitID]; ok {
+					dep.ParentTraitID = resolvedId
+				} else if resolvedId, ok := nameEnToTraitId[sanitizeToID(dep.ParentTraitID)]; ok {
+					dep.ParentTraitID = resolvedId
+				}
+				dependency = dep
+			}
+		}
+
+		spec := parseTypeSpec(cleanString(getCell(rows, r, headerMap["#type"])))
+
+		trait := Trait{
+			ID:               fmt.Sprintf("t%04d", len(matrix.Traits)+1),
+			TraitID:          traitID,
+			NameEN:           traitNameEN,
+			NameJP:           cleanString(getCell(rows, r, headerMap["#trait_ja"])),
+			GroupEN:          cleanString(getCell(rows, r, headerMap["#group_en"])),
+			GroupJP:          cleanString(getCell(rows, r, headerMap["#group_jp"])),
+			Type:             "",
+			ParentDependency: dependency,
+			Difficulty:       parseDifficulty(cleanString(getCell(rows, r, headerMap["#difficulty"]))),
+			Risk:             parseRisk(cleanString(getCell(rows, r, headerMap["#risk"]))),
+			HelpTextEN:       getCell(rows, r, headerMap["#helptext_en"]),
+			HelpTextJP:       getCell(rows, r, headerMap["#helptext_ja"]),
+			HelpImages:       strings.Split(cleanString(getCell(rows, r, headerMap["#helpimages"])), ","),
 		}
 
 		switch spec.kind {
 		case kindBinary:
-			internalID := fmt.Sprintf("t%04d", len(m.Traits)+1)
-			m.Traits = append(m.Traits, Trait{
-				ID: internalID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "binary",
-				Difficulty: difficultyVal, Risk: riskVal, Parent: parentName, ParentDependency: dependency,
-				HelpText: helpText, HelpImages: helpImages,
-			})
-			for i, col := range taxonCols {
-				m.Taxa[taxonIndex[taxonNames[i]]].Traits[internalID] = parseTernaryCell(getRawCell(rows, r, col))
+			trait.Type = "binary"
+			matrix.Traits = append(matrix.Traits, trait)
+			for i, taxID := range taxonIDs {
+				taxaMap[taxID].Traits[trait.ID] = parseTernaryCell(getCell(rows, r, taxonCols[i]))
 			}
 
 		case kindNominal, kindOrdinal:
@@ -362,14 +450,10 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			if len(states) == 0 {
 				uniq := map[string]struct{}{}
 				for _, col := range taxonCols {
-					raw := cleanString(getRawCell(rows, r, col))
+					raw := cleanString(getCell(rows, r, col))
 					if raw != "" {
 						uniq[raw] = struct{}{}
 					}
-				}
-				if len(uniq) == 0 {
-					log.Printf("[EXCEL PARSER] Warning: Nominal trait '%s' has no states. Skipping.", traitName)
-					continue
 				}
 				for k := range uniq {
 					states = append(states, k)
@@ -377,25 +461,30 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				sort.Strings(states)
 			}
 
-			parentTraitID := fmt.Sprintf("t%04d_parent", len(m.Traits)+1)
-			m.Traits = append(m.Traits, Trait{
-				ID: parentTraitID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "nominal_parent",
-				Difficulty: difficultyVal, Risk: riskVal, ParentDependency: dependency,
-				HelpText: helpText, HelpImages: helpImages, States: states,
-			})
+			trait.Type = "nominal_parent"
+			trait.States = states
+			matrix.Traits = append(matrix.Traits, trait)
 
 			derivedIDs := make([]string, len(states))
 			for i, st := range states {
-				tid := fmt.Sprintf("t%04d", len(m.Traits)+1)
-				derivedIDs[i] = tid
-				m.Traits = append(m.Traits, Trait{
-					ID: tid, Name: fmt.Sprintf("%s = %s", traitName, st), Group: group, Type: "derived",
-					Parent: traitName, State: st, Difficulty: difficultyVal, Risk: riskVal,
-					HelpText: helpText, HelpImages: helpImages,
+				childID := fmt.Sprintf("t%04d", len(matrix.Traits)+1)
+				derivedIDs[i] = childID
+				matrix.Traits = append(matrix.Traits, Trait{
+					ID:         childID,
+					TraitID:    fmt.Sprintf("%s_state%d", trait.TraitID, i),
+					NameEN:     fmt.Sprintf("%s = %s", trait.NameEN, st),
+					NameJP:     fmt.Sprintf("%s = %s", trait.NameJP, st),
+					GroupEN:    trait.GroupEN,
+					GroupJP:    trait.GroupJP,
+					Type:       "derived",
+					Parent:     trait.TraitID,
+					ParentName: trait.NameEN,
+					State:      st,
 				})
 			}
-			for i, col := range taxonCols {
-				raw := cleanString(getRawCell(rows, r, col))
+
+			for i, taxID := range taxonIDs {
+				raw := cleanString(getCell(rows, r, taxonCols[i]))
 				which := -1
 				for j, st := range states {
 					if strings.EqualFold(st, raw) {
@@ -403,30 +492,28 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 						break
 					}
 				}
-				idx := taxonIndex[taxonNames[i]]
 				for j, tid := range derivedIDs {
 					if which == j {
-						m.Taxa[idx].Traits[tid] = Yes
+						taxaMap[taxID].Traits[tid] = Yes
 					} else {
-						m.Taxa[idx].Traits[tid] = No
+						taxaMap[taxID].Traits[tid] = No
 					}
 				}
 				if which < 0 {
 					for _, tid := range derivedIDs {
-						m.Taxa[idx].Traits[tid] = NA
+						taxaMap[taxID].Traits[tid] = NA
 					}
 				}
 			}
 
 		case kindContinuous:
-			internalID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			trait.Type = "continuous"
 			overallMin, overallMax := math.Inf(1), math.Inf(-1)
 			hasValues, isInteger := false, true
 
-			for i, col := range taxonCols {
-				if val, ok := parseRange(getRawCell(rows, r, col)); ok {
-					idx := taxonIndex[taxonNames[i]]
-					m.Taxa[idx].ContinuousTraits[internalID] = val
+			for i, taxID := range taxonIDs {
+				if val, ok := parseRange(getCell(rows, r, taxonCols[i])); ok {
+					taxaMap[taxID].ContinuousTraits[trait.ID] = val
 					if val.Min < overallMin {
 						overallMin = val.Min
 					}
@@ -441,19 +528,17 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 			}
 
 			if hasValues {
-				m.Traits = append(m.Traits, Trait{
-					ID: internalID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "continuous",
-					Difficulty: difficultyVal, Risk: riskVal, ParentDependency: dependency,
-					HelpText: helpText, HelpImages: helpImages,
-					MinValue: overallMin, MaxValue: overallMax, IsInteger: isInteger,
-				})
+				trait.MinValue = overallMin
+				trait.MaxValue = overallMax
+				trait.IsInteger = isInteger
+				matrix.Traits = append(matrix.Traits, trait)
 			}
 
 		case kindCategoricalMulti:
-			internalID := fmt.Sprintf("t%04d", len(m.Traits)+1)
+			trait.Type = "categorical_multi"
 			allStates := make(map[string]struct{})
-			for i, col := range taxonCols {
-				valStr := getRawCell(rows, r, col)
+			for i, taxID := range taxonIDs {
+				valStr := getCell(rows, r, taxonCols[i])
 				if valStr == "" {
 					continue
 				}
@@ -466,7 +551,7 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 					}
 				}
 				if len(values) > 0 {
-					m.Taxa[taxonIndex[taxonNames[i]]].CategoricalTraits[internalID] = values
+					taxaMap[taxID].CategoricalTraits[trait.ID] = values
 				}
 			}
 
@@ -475,58 +560,10 @@ func (m *Matrix) LoadMatrixExcel(path string) (*LoadSummary, error) {
 				states = append(states, state)
 			}
 			sort.Strings(states)
-
-			m.Traits = append(m.Traits, Trait{
-				ID: internalID, TraitID: traitIDStr, Name: traitName, Group: group, Type: "categorical_multi",
-				Difficulty: difficultyVal, Risk: riskVal, ParentDependency: dependency,
-				HelpText: helpText, HelpImages: helpImages, States: states,
-			})
+			trait.States = states
+			matrix.Traits = append(matrix.Traits, trait)
 		}
 	}
 
-	metaSheetName := "TaxaMeta"
-	if metaSheetRows, err := f.GetRows(metaSheetName); err == nil && len(metaSheetRows) > 1 {
-		log.Printf("[EXCEL PARSER] Found 'TaxaMeta' sheet. Loading details...")
-		header := metaSheetRows[0]
-		colIdxName, colIdxDesc, colIdxRefs, colIdxImages := -1, -1, -1, -1
-		for i, h := range header {
-			switch strings.ToLower(cleanString(h)) {
-			case "#taxonname":
-				colIdxName = i
-			case "#description":
-				colIdxDesc = i
-			case "#references":
-				colIdxRefs = i
-			case "#images":
-				colIdxImages = i
-			}
-		}
-
-		if colIdxName != -1 {
-			for r := 1; r < len(metaSheetRows); r++ {
-				taxonName := cleanString(getRawCell(metaSheetRows, r, colIdxName))
-				if idx, ok := taxonIndex[taxonName]; ok {
-					m.Taxa[idx].Description = getRawCell(metaSheetRows, r, colIdxDesc)
-					m.Taxa[idx].References = getRawCell(metaSheetRows, r, colIdxRefs)
-					if imageStr := cleanString(getRawCell(metaSheetRows, r, colIdxImages)); imageStr != "" {
-						m.Taxa[idx].Images = regexp.MustCompile(`[ ,;]+`).Split(imageStr, -1)
-					}
-				}
-			}
-		}
-	}
-
-	sum := &LoadSummary{Dir: path, Traits: len(m.Traits), Taxa: len(m.Taxa), FilesParsed: 1}
-	if sum.Traits == 0 || sum.Taxa == 0 {
-		return sum, errors.New("parsed zero traits or taxa")
-	}
-	log.Printf("[EXCEL PARSER] Successfully loaded matrix. Traits: %d, Taxa: %d", sum.Traits, sum.Taxa)
-	return sum, nil
-}
-
-func Nary(b bool) Ternary {
-	if b {
-		return Yes
-	}
-	return No
+	return nil
 }

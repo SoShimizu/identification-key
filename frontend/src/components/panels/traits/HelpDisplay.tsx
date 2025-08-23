@@ -1,6 +1,6 @@
 // frontend/src/components/panels/traits/HelpDisplay.tsx
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress, Paper, Stack, Modal, IconButton, Tabs, Tab, Grid, Divider } from '@mui/material';
+import { Box, Typography, CircularProgress, Paper, Grid, Modal, IconButton, Tabs, Tab } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Trait } from '../../../api';
 import { GetHelpImage } from '../../../../wailsjs/go/main/App';
@@ -11,12 +11,12 @@ type Props = {
   lang: "ja" | "en";
 };
 
-// Component to safely render HTML content
 const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
     return <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: content }} />;
 };
 
 const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ filename, onClick }) => {
+    // ... (implementation unchanged)
     const [imageData, setImageData] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -49,10 +49,12 @@ export default function HelpDisplay({ trait, lang }: Props) {
   const [modalImage, setModalImage] = useState<string | null>(null);
   
   const T = STR[lang].panels;
+  
+  const helpText = lang === 'ja' ? trait?.helpText_jp : trait?.helpText_en;
 
   const tabs = [];
-  if (trait?.helpText) tabs.push("Note");
-  if (trait?.helpImages && trait.helpImages.length > 0) tabs.push("Images");
+  if (helpText) tabs.push("Note");
+  if (trait?.helpImages && trait.helpImages.length > 0 && trait.helpImages[0] !== "") tabs.push("Images");
   
   const [activeTab, setActiveTab] = useState(0);
 
@@ -84,8 +86,8 @@ export default function HelpDisplay({ trait, lang }: Props) {
     <>
       <Paper variant="outlined" sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Box sx={{flexShrink: 0}}>
-            <Typography variant="caption" color="text.secondary">{trait.group}</Typography>
-            <Typography variant="h6" component="h3">{trait.name}</Typography>
+            <Typography variant="caption" color="text.secondary">{lang === 'ja' ? trait.group_jp : trait.group_en}</Typography>
+            <Typography variant="h6" component="h3">{lang === 'ja' ? trait.name_jp : trait.name_en}</Typography>
         </Box>
         
         {!hasHelpContent ? (
@@ -100,8 +102,8 @@ export default function HelpDisplay({ trait, lang }: Props) {
                     </Tabs>
                 </Box>
                 <Box sx={{ flex: 1, overflowY: 'auto', pt: 2 }}>
-                    {tabs[activeTab] === "Note" && trait.helpText && (
-                        <HtmlRenderer content={trait.helpText} />
+                    {tabs[activeTab] === "Note" && helpText && (
+                        <HtmlRenderer content={helpText} />
                     )}
                     {tabs[activeTab] === "Images" && trait.helpImages && (
                         <Grid container spacing={2}>

@@ -11,11 +11,11 @@ import { STR } from "../../../i18n";
 import { Taxon, Justification, MultiChoice, Choice } from "../../../api";
 import { GetJustificationForTaxon } from "../../../../wailsjs/go/main/App";
 import JustificationPanel from "./JustificationPanel";
-
+import { FormattedScientificName } from "../taxa/TaxonDetailPanel";
 
 export type EngineScore = {
   rank?: number;
-  taxon: Taxon; // Use the full Taxon object
+  taxon: Taxon;
   post?: number;
   delta?: number;
   used?: number;
@@ -171,7 +171,9 @@ export default function CandidatesPanel({
                     />
                 </TableCell>
                 <TableCell>{r.rank ?? i + 1}</TableCell>
-                <TableCell>{r.taxon?.name}</TableCell>
+                <TableCell>
+                  <FormattedScientificName taxon={r.taxon} lang={lang} />
+                </TableCell>
                 <ScoreCell score={r.post ?? 0} />
                 <TableCell>{(r.delta ?? 0).toExponential(2)}</TableCell>
                 <TableCell align="center">
@@ -184,9 +186,11 @@ export default function CandidatesPanel({
                 {showMatchSupport && <TableCell>{`${r.match ?? 0}/${r.support ?? 0}`}</TableCell>}
                 <TableCell align="center">
                     <Tooltip title={`Why is ${r.taxon?.name} ranked here?`}>
-                        <IconButton size="small" onClick={(e) => handleWhyClick(e, r.taxon)}>
+                        <span>
+                        <IconButton size="small" onClick={(e) => handleWhyClick(e, r.taxon)} disabled={!selected || Object.keys(selected).length === 0 && Object.keys(selectedMulti).length === 0}>
                             <HelpOutlineIcon fontSize="small"/>
                         </IconButton>
+                        </span>
                     </Tooltip>
                 </TableCell>
               </TableRow>

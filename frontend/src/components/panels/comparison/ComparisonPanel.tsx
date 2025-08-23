@@ -18,6 +18,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { Trait, Taxon } from "../../../api";
 import { STR } from "../../../i18n";
+import { FormattedScientificName } from "../taxa/TaxonDetailPanel";
 
 type Props = {
   lang: "ja" | "en";
@@ -27,9 +28,7 @@ type Props = {
   onClose: () => void;
 };
 
-// ✨ バグを修正し、より堅牢にしたヘルパー関数
 const getTraitState = (taxon: Taxon, trait: Trait, allTraits: Trait[]): string => {
-    // 1. Binary trait:単純なYes/No/NAを返す
     if (trait.type === 'binary') {
         const state = taxon.traits?.[trait.id];
         switch (state) {
@@ -39,20 +38,16 @@ const getTraitState = (taxon: Taxon, trait: Trait, allTraits: Trait[]): string =
         }
     }
 
-    // 2. Parent trait (nominal or ordinal): 派生形質から状態名を探す
     if (trait.type === 'nominal_parent') {
-        // この親形質に属するすべての子（derived）形質を探す
-        const childTraits = allTraits.filter(t => t.parent === trait.name);
+        const childTraits = allTraits.filter(t => t.parent === trait.traitId);
         
-        // タクソンのデータを見て、どの子形質が 'Yes' (1) になっているか探す
         for (const child of childTraits) {
             if (taxon.traits?.[child.id] === 1) {
-                return child.state || child.name; // 'orange', 'small' などの状態名を返す
+                return child.state || child.name_en; 
             }
         }
     }
     
-    // 該当する状態が見つからなければNA
     return "NA";
 };
 
@@ -65,22 +60,20 @@ export default function ComparisonPanel({ lang, allTraits, allTaxa, comparisonLi
   }, [allTaxa, comparisonList]);
 
   const displayTraits = useMemo(() => {
-    // 派生形質（derived）を除き、ユーザーが直接選択する可能性のある親形質のみを表示対象とする
     const userSelectableTraits = allTraits.filter(t => t.type !== 'derived');
 
     if (!hideSame || comparedTaxa.length < 2) {
         return userSelectableTraits;
     }
 
-    // 違いのある形質のみをフィルタリング
     return userSelectableTraits.filter(trait => {
         const firstState = getTraitState(comparedTaxa[0], trait, allTraits);
         for (let i = 1; i < comparedTaxa.length; i++) {
             if (getTraitState(comparedTaxa[i], trait, allTraits) !== firstState) {
-                return true; // 違いが見つかった
+                return true;
             }
         }
-        return false; // すべて同じだった
+        return false;
     });
   }, [allTraits, comparedTaxa, hideSame]);
 
@@ -112,7 +105,9 @@ export default function ComparisonPanel({ lang, allTraits, allTaxa, comparisonLi
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>{T.trait}</TableCell>
               {comparedTaxa.map(taxon => (
-                <TableCell key={taxon.id} sx={{ fontWeight: 'bold', minWidth: 150 }}>{taxon.name}</TableCell>
+                <TableCell key={taxon.id} sx={{ fontWeight: 'bold', minWidth: 150 }}>
+                    <FormattedScientificName taxon={taxon} lang={lang} />
+                </TableCell>
               ))}
             </TableRow>
           </TableHead>
@@ -124,8 +119,8 @@ export default function ComparisonPanel({ lang, allTraits, allTaxa, comparisonLi
                 return (
                     <TableRow key={trait.id} sx={{ bgcolor: areDifferent ? 'action.hover' : 'transparent' }}>
                         <TableCell component="th" scope="row">
-                            <Typography variant="caption" color="text.secondary">{trait.group}</Typography>
-                            <Typography variant="body2">{trait.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">{lang === 'ja' ? trait.group_jp || trait.group_en : trait.group_en || trait.group_jp}</Typography>
+                            <Typography variant="body2">{lang === 'ja' ? trait.name_jp || trait.name_en : trait.name_en || trait.name_jp}</Typography>
                         </TableCell>
                         {comparedTaxa.map((taxon, index) => (
                         <TableCell key={taxon.id}>

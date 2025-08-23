@@ -41,7 +41,7 @@ func evaluateBayes(m *Matrix, selected map[string]int, selectedMulti map[string]
 
 		if trait.Type == "categorical_multi" {
 			truthValues, _ := taxon.CategoricalTraits[traitID]
-			log.Printf("[getTruth] For Taxon '%s', Trait '%s', DB value is: %v", taxon.Name, trait.Name, truthValues)
+			log.Printf("[getTruth] For Taxon '%s', Trait '%s', DB value is: %v", taxon.Name, trait.NameEN, truthValues)
 		}
 
 		switch trait.Type {
@@ -79,7 +79,7 @@ func evaluateBayes(m *Matrix, selected map[string]int, selectedMulti map[string]
 		case "categorical_multi":
 			// MODIFIED: Read directly from selectedMulti map
 			if states, ok := selectedMulti[traitID]; ok && len(states) > 0 {
-				log.Printf("[getObs] User selection for trait '%s': %v", trait.Name, states)
+				log.Printf("[getObs] User selection for trait '%s': %v", trait.NameEN, states)
 				return BayesObservation{Kind: BayesTraitCategoricalMulti, StatesMulti: states}, true
 			}
 		default: // binary

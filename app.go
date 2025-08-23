@@ -1,4 +1,4 @@
-// backend/app.go
+// app.go
 package main
 
 import (
@@ -65,13 +65,17 @@ func (a *App) setCurrentKeyByPath(p string) error {
 	if p == "" {
 		return errors.New("empty path")
 	}
-	m := &engine.Matrix{}
-	if _, err := m.LoadMatrixExcel(p); err != nil {
+
+	// CORRECTED: Call the package function and assign the result
+	matrix, err := engine.LoadMatrixExcel(p)
+	if err != nil {
 		return fmt.Errorf("load matrix: %w", err)
 	}
-	a.currentMatrix = m
+
+	a.currentMatrix = matrix
 	a.currentPath = p
 	a.currentKey = filepath.Base(p)
+
 	// UIへ反映
 	runtime.EventsEmit(a.ctx, "matrix_changed")
 	return nil

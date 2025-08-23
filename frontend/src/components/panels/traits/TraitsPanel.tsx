@@ -27,7 +27,7 @@ type Props = {
   setBinary: (traitId: string, val: Choice | null, label: string) => void;
   setContinuous: (traitId: string, val: number | null, label: string) => void;
   setMulti: (traitId: string, values: MultiChoice, label: string) => void;
-  setMultiAsNA: (traitId: string, label?: string) => void; // BUG FIX: Add prop to type
+  setMultiAsNA: (traitId: string, label?: string) => void;
   setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
   clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
   sortBy: "recommend" | "group" | "name";
@@ -36,7 +36,7 @@ type Props = {
   lang?: "ja" | "en";
 };
 
-// getRowSuggestion, ScoreBarは変更なし
+// getRowSuggestion, ScoreBar, ContinuousInput, MultiChoiceInlineInput remain unchanged...
 function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion>): TraitSuggestion | undefined {
     if (row.type === "binary") return suggMap[row.binary.id];
     if (row.type === "continuous") return suggMap[row.continuous.id];
@@ -47,7 +47,7 @@ function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion
 const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) => {
     if (!suggestion || !(suggestion.score > 0)) return null;
     const baseScore = suggestion.score;
-    const ig = suggestion.ig > 0 ? suggestion.ig : 1; // Avoid division by zero
+    const ig = suggestion.ig > 0 ? suggestion.ig : 1;
     const normalizedScore = Math.max(0, baseScore / ig);
     const w = Math.max(2, Math.min(100, Math.round(normalizedScore * 100)));
     const tooltipTitle = `Score: ${suggestion.score.toFixed(3)} (IG: ${suggestion.ig?.toFixed(3) ?? 'N/A'} / MaxIG: ${suggestion.max_ig?.toFixed(3) ?? 'N/A'})`;
@@ -61,7 +61,6 @@ const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) =
       </Tooltip>
     );
 });
-
 
 const ContinuousInput = ({ trait, selectedValue, onApply }: { trait: Trait, selectedValue: number | undefined, onApply: (val: number | null) => void }) => {
     const [localValue, setLocalValue] = useState<number | string>(selectedValue ?? "");
@@ -173,8 +172,10 @@ const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setCont
   const chosenId = r.type === 'derived' ? r.children.find(c => selected[c.id] === 1)?.id : undefined;
 
   const traitObject = r.type === 'binary' ? r.binary : r.type === 'continuous' ? r.continuous : r.type === 'categorical_multi' ? r.multi : r.parentTrait;
-  const hasHelpText = traitObject.helpText && traitObject.helpText.trim() !== "";
-  const hasHelpImages = traitObject.helpImages && traitObject.helpImages.length > 0;
+  const helpText = lang === 'ja' ? traitObject.helpText_jp : traitObject.helpText_en;
+  const hasHelpText = helpText && helpText.trim() !== "";
+  const hasHelpImages = traitObject.helpImages && traitObject.helpImages.length > 0 && traitObject.helpImages[0] !== "";
+
 
   return (
     <TableRow hover onClick={() => onTraitSelect(traitObject)} sx={{ cursor: 'pointer' }}>
@@ -215,7 +216,6 @@ const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setCont
   );
 });
 
-// TraitsPanel本体
 export default function TraitsPanel(props: Props) {
   const { mode, rows, selected, selectedMulti, sortBy, suggMap } = props;
 
@@ -224,7 +224,7 @@ export default function TraitsPanel(props: Props) {
         if (r.type === 'binary') return mode === 'selected' ? selected[r.binary.id] !== undefined : selected[r.binary.id] === undefined;
         if (r.type === 'continuous') return mode === 'selected' ? selected[r.continuous.id] !== undefined : selected[r.continuous.id] === undefined;
         if (r.type === 'categorical_multi') {
-            const isSelectedWithValues = selectedMulti[r.multi.id] !== undefined; // An empty array is a valid selection
+            const isSelectedWithValues = props.selectedMulti[r.multi.id] !== undefined;
             const isSelectedAsNA = selected[r.multi.id] === 0;
             return mode === 'selected' ? isSelectedWithValues || isSelectedAsNA : !isSelectedWithValues && !isSelectedAsNA;
         }
@@ -246,7 +246,7 @@ export default function TraitsPanel(props: Props) {
         }
         return a.traitName.localeCompare(b.traitName);
       });
-  }, [rows, mode, selected, selectedMulti, sortBy, suggMap]);
+  }, [rows, mode, selected, selectedMulti, sortBy, suggMap, props.selectedMulti]);
 
   const localSuggRank = useMemo(() => {
     if (sortBy !== 'recommend') return {};
@@ -276,7 +276,7 @@ export default function TraitsPanel(props: Props) {
             {filteredAndSortedRows.map((r) => {
                 const suggestion = getRowSuggestion(r, suggMap);
               return (<RowRenderer
-                key={r.type === 'binary' ? r.binary.id : r.type === 'continuous' ? r.continuous.id : r.type === 'categorical_multi' ? r.multi.id : r.traitName}
+                key={r.type === 'binary' ? r.binary.id : r.type === 'continuous' ? r.continuous.id : r.type === 'categorical_multi' ? r.multi.id : r.parentTrait.id}
                 r={r}
                 suggestion={suggestion}
                 rank={sortBy === 'recommend' ? localSuggRank[suggestion?.traitId ?? ''] : undefined}

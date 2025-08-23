@@ -1,6 +1,23 @@
 // backend/engine/engine_types.go
 package engine
 
+// MatrixInfo contains metadata about the entire matrix.
+type MatrixInfo struct {
+	TitleEN       string `json:"title_en"`
+	TitleJP       string `json:"title_jp"`
+	Version       string `json:"version"`
+	DescriptionEN string `json:"description_en"`
+	DescriptionJP string `json:"description_jp"`
+	AuthorsEN     string `json:"authors_en"`
+	AuthorsJP     string `json:"authors_jp"`
+	ContactEN     string `json:"contact_en"`
+	ContactJP     string `json:"contact_jp"`
+	CitationEN    string `json:"citation_en"`
+	CitationJP    string `json:"citation_jp"`
+	ReferencesEN  string `json:"references_en"`
+	ReferencesJP  string `json:"references_jp"`
+}
+
 // Dependency holds parsed dependency rule information.
 type Dependency struct {
 	ParentTraitID string `json:"parentTraitId"`
@@ -23,16 +40,20 @@ const (
 
 type Trait struct {
 	ID               string      `json:"id"`
-	TraitID          string      `json:"traitId,omitempty"` // User-defined ID from Excel
-	Name             string      `json:"name"`
-	Group            string      `json:"group"`
+	TraitID          string      `json:"traitId,omitempty"` // User-defined ID from Excel (#TraitID)
+	NameEN           string      `json:"name_en"`
+	NameJP           string      `json:"name_jp"`
+	GroupEN          string      `json:"group_en"`
+	GroupJP          string      `json:"group_jp"`
 	Type             string      `json:"type"`
-	Parent           string      `json:"parent,omitempty"`           // For derived traits
+	Parent           string      `json:"parent,omitempty"`           // For derived traits (references TraitID)
+	ParentName       string      `json:"parentName,omitempty"`       // For derived traits (references Trait Name for display)
 	ParentDependency *Dependency `json:"parentDependency,omitempty"` // For dependency rules
 	State            string      `json:"state,omitempty"`
 	Difficulty       float64     `json:"difficulty,omitempty"`
 	Risk             float64     `json:"risk,omitempty"`
-	HelpText         string      `json:"helpText,omitempty"`
+	HelpTextEN       string      `json:"helpText_en,omitempty"`
+	HelpTextJP       string      `json:"helpText_jp,omitempty"`
 	HelpImages       []string    `json:"helpImages,omitempty"`
 	MinValue         float64     `json:"minValue,omitempty"`
 	MaxValue         float64     `json:"maxValue,omitempty"`
@@ -41,20 +62,37 @@ type Trait struct {
 }
 
 type Taxon struct {
-	ID                string                     `json:"id"`
-	Name              string                     `json:"name"`
+	ID                string                     `json:"id"`   // From #TaxonID
+	Name              string                     `json:"name"` // For display, from ScientificName
+	ScientificName    string                     `json:"scientificName"`
+	TaxonAuthor       string                     `json:"taxonAuthor,omitempty"`
+	VernacularNameEN  string                     `json:"vernacularName_en,omitempty"`
+	VernacularNameJP  string                     `json:"vernacularName_ja,omitempty"`
+	DescriptionEN     string                     `json:"description_en,omitempty"`
+	DescriptionJP     string                     `json:"description_ja,omitempty"`
+	Images            []string                   `json:"images,omitempty"`
+	References        string                     `json:"references,omitempty"`
 	Traits            map[string]Ternary         `json:"traits"`
 	ContinuousTraits  map[string]ContinuousValue `json:"continuousTraits"`
 	CategoricalTraits map[string][]string        `json:"categoricalTraits"`
-	Description       string                     `json:"description,omitempty"`
-	References        string                     `json:"references,omitempty"`
-	Images            []string                   `json:"images,omitempty"`
+	// Taxonomic Ranks
+	Order       string `json:"order,omitempty"`
+	Superfamily string `json:"superfamily,omitempty"`
+	Family      string `json:"family,omitempty"`
+	Subfamily   string `json:"subfamily,omitempty"`
+	Tribe       string `json:"tribe,omitempty"`
+	Subtribe    string `json:"subtribe,omitempty"`
+	Genus       string `json:"genus,omitempty"`
+	Subgenus    string `json:"subgenus,omitempty"`
+	Species     string `json:"species,omitempty"`
+	Subspecies  string `json:"subspecies,omitempty"`
 }
 
 type Matrix struct {
-	Name   string  `json:"name"`
-	Traits []Trait `json:"traits"`
-	Taxa   []Taxon `json:"taxa"`
+	Name   string     `json:"name"`
+	Info   MatrixInfo `json:"info"`
+	Traits []Trait    `json:"traits"`
+	Taxa   []Taxon    `json:"taxa"`
 }
 
 type TaxonScore struct {
@@ -73,8 +111,8 @@ type StateProb struct {
 }
 type TraitSuggestion struct {
 	TraitId    string      `json:"traitId"`
-	Name       string      `json:"name"`
-	Group      string      `json:"group"`
+	Name       string      `json:"name"`  // This will be lang-specific in frontend
+	Group      string      `json:"group"` // This will be lang-specific in frontend
 	IG         float64     `json:"ig"`
 	MaxIG      float64     `json:"max_ig"`
 	ECR        float64     `json:"ecr"`

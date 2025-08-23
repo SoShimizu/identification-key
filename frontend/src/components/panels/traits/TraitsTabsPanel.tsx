@@ -1,11 +1,13 @@
 // frontend/src/components/panels/traits/TraitsTabsPanel.tsx
 import React, { useState } from 'react';
-import { Box, Tab, Tabs, ButtonGroup, Button, Stack, Divider } from '@mui/material';
+import { Box, Tab, Tabs, ButtonGroup, Button, Stack, Divider, IconButton, Tooltip } from '@mui/material';
 import TraitsPanel, { TraitRow } from './TraitsPanel';
 import { Trait, TraitSuggestion, MultiChoice } from '../../../api';
 import { AlgoOptions } from '../../../hooks/useAlgoOpts';
 import { STR } from '../../../i18n';
 import ReplayIcon from '@mui/icons-material/Replay';
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
 
 type Props = {
     lang: "ja" | "en";
@@ -15,7 +17,7 @@ type Props = {
     setBinary: (traitId: string, val: number | null, label: string) => void;
     setContinuous: (traitId: string, val: number | null, label: string) => void;
     setMulti: (traitId: string, values: MultiChoice, label: string) => void;
-    setMultiAsNA: (traitId: string, label?: string) => void; // Add this line
+    setMultiAsNA: (traitId: string, label?: string) => void;
     setDerivedPick: (childrenIds: string[], chosenId: string, parentLabel: string) => void;
     clearDerived: (childrenIds: string[], parentLabel?: string, asNA?: boolean) => void;
     clearAllSelections: () => void;
@@ -26,10 +28,15 @@ type Props = {
     opts: AlgoOptions;
     setOpts: React.Dispatch<React.SetStateAction<AlgoOptions>>;
     onTraitSelect: (trait?: Trait) => void;
+    // Undo/Redo props
+    undo: () => void;
+    redo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
 };
 
 export default function TraitsTabsPanel(props: Props) {
-    const { lang, sortBy, setSortBy, selected, clearAllSelections } = props;
+    const { lang, sortBy, setSortBy, selected, clearAllSelections, undo, redo, canUndo, canRedo } = props;
     const [activeTab, setActiveTab] = useState<"unselected" | "selected">("unselected");
     const T = STR[lang].traitsPanel;
 
@@ -43,6 +50,13 @@ export default function TraitsTabsPanel(props: Props) {
                     <Tab label={STR[lang].panels.traits_selected} value="selected" />
                 </Tabs>
                 <Stack direction="row" alignItems="center" spacing={1}>
+                    <Tooltip title="Undo">
+                        <span><IconButton onClick={undo} disabled={!canUndo} size="small"><UndoIcon/></IconButton></span>
+                    </Tooltip>
+                    <Tooltip title="Redo">
+                        <span><IconButton onClick={redo} disabled={!canRedo} size="small"><RedoIcon/></IconButton></span>
+                    </Tooltip>
+                    <Divider orientation="vertical" flexItem />
                     <ButtonGroup size="small" variant="outlined">
                         <Button onClick={() => setSortBy("recommend")} variant={sortBy === "recommend" ? "contained" : "outlined"}>{T.sort_recommend}</Button>
                         <Button onClick={() => setSortBy("group")} variant={sortBy === "group" ? "contained" : "outlined"}>{T.sort_group}</Button>
