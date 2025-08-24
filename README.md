@@ -4,6 +4,8 @@ A cross-platform desktop application for interactive multi-access taxonomic keys
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![ソフトの説明](readme_images/sample.png)
+
 （ここにアプリケーションのスクリーンショットを挿入）
 
 ## Overview
