@@ -32,6 +32,7 @@ export namespace engine {
 	    id: string;
 	    name: string;
 	    scientificName: string;
+	    rank?: string;
 	    taxonAuthor?: string;
 	    vernacularName_en?: string;
 	    vernacularName_ja?: string;
@@ -62,6 +63,7 @@ export namespace engine {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.scientificName = source["scientificName"];
+	        this.rank = source["rank"];
 	        this.taxonAuthor = source["taxonAuthor"];
 	        this.vernacularName_en = source["vernacularName_en"];
 	        this.vernacularName_ja = source["vernacularName_ja"];

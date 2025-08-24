@@ -1,13 +1,14 @@
 // frontend/src/components/header/Ribbon.tsx
 import React, { useState } from "react";
 import {
-  AppBar, Box, Collapse, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Toolbar, Tooltip, Typography, Switch, SelectChangeEvent, Theme, IconButton, Button, Divider
+  AppBar, Box, Collapse, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Toolbar, Tooltip, Typography, Switch, SelectChangeEvent, Theme, IconButton, Button, Divider, Stack
 } from "@mui/material";
 import SettingsIcon from '@mui/icons-material/Settings';
 import TranslateIcon from '@mui/icons-material/Translate';
 import HomeIcon from '@mui/icons-material/Home';
 import CloseIcon from '@mui/icons-material/Close';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh'; // 更新アイコンをインポート
 
 import RibbonWelcomeTab from "./RibbonWelcomeTab";
 import ReportDialog from "./ReportDialog";
@@ -41,7 +42,7 @@ export type RibbonProps = {
 type TabKey = "welcome" | "settings";
 
 export default function Ribbon(props: RibbonProps) {
-  const { lang, setLang, keys, activeKey, onPickKey, algo, setAlgo, themeMode, setThemeMode, opts, setOpts, matrixInfo, matrixName, history, scores } = props;
+  const { lang, setLang, keys, activeKey, onPickKey, onRefreshKeys, algo, setAlgo, themeMode, setThemeMode, opts, setOpts, matrixInfo, matrixName, history, scores } = props;
   const T = STR[lang];
   const [tab, setTab] = useState<TabKey | false>(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
@@ -55,10 +56,10 @@ export default function Ribbon(props: RibbonProps) {
         color="default"
         elevation={0}
         sx={{ zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
-    >
+      >
         <Toolbar sx={{ px: 2, minHeight: 48, gap: 1 }}>
           <Typography variant="h6" sx={{ mr: 2, fontWeight: "bold", cursor: 'pointer' }} onClick={() => BrowserOpenURL("https://github.com/soshimizu/identification-key")}>
-              MyKeyLogue
+            MyKeyLogue
           </Typography>
 
           <Tabs value={tab} onChange={(_, v: TabKey | false) => setTab(v)} onMouseLeave={() => setTab(false)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
@@ -68,14 +69,22 @@ export default function Ribbon(props: RibbonProps) {
 
           <Box sx={{ flex: 1 }} />
 
-          <FormControl size="small" sx={{ minWidth: 240, mr: 1 }}>
-            <InputLabel>{T.ribbon.switchMatrix}</InputLabel>
-            <Select label={T.ribbon.switchMatrix} value={activeKey || ""} onChange={(e: SelectChangeEvent<string>) => onPickKey(String(e.target.value))}>
-              {(keys || []).map((k) => <MenuItem key={k.name} value={k.name}>{k.name}</MenuItem>)}
-            </Select>
-          </FormControl>
+          {/* 修正：SelectとIconButtonをStackでグループ化 */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <FormControl size="small" sx={{ minWidth: 240 }}>
+              <InputLabel>{T.ribbon.switchMatrix}</InputLabel>
+              <Select label={T.ribbon.switchMatrix} value={activeKey || ""} onChange={(e: SelectChangeEvent<string>) => onPickKey(String(e.target.value))}>
+                {(keys || []).map((k) => <MenuItem key={k.name} value={k.name}>{k.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <Tooltip title={T.ribbon.refresh_keys}>
+              <IconButton onClick={onRefreshKeys}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Stack>
           
-          <Divider orientation="vertical" flexItem />
+          <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
           
           <Tooltip title="Export Identification Report">
               <span>
@@ -85,7 +94,7 @@ export default function Ribbon(props: RibbonProps) {
               </span>
           </Tooltip>
 
-          <Divider orientation="vertical" flexItem />
+          <Divider orientation="vertical" flexItem sx={{ mx: 1 }}/>
           
           <FormControl size="small" variant="outlined" sx={{ minWidth: 140 }}>
               <InputLabel>Language</InputLabel>
@@ -102,14 +111,14 @@ export default function Ribbon(props: RibbonProps) {
 
         <Collapse in={tab !== false} sx={{ transitionDuration: '800ms' }}>
           <Box
-              onMouseEnter={() => setTab(tab)} onMouseLeave={() => setTab(false)}
-              sx={{
-                  position: 'absolute', left: 0, right: 0, px: 2, py: 2,
-                  bgcolor: 'background.default',
-                  boxShadow: '0px 4px 12px -2px rgba(0,0,0,0.1)',
-                  borderBottom: 1,
-                  borderBottomColor: (theme: Theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.300',
-              }}
+            onMouseEnter={() => setTab(tab)} onMouseLeave={() => setTab(false)}
+            sx={{
+                position: 'absolute', left: 0, right: 0, px: 2, py: 2,
+                bgcolor: 'background.default',
+                boxShadow: '0px 4px 12px -2px rgba(0,0,0,0.1)',
+                borderBottom: 1,
+                borderBottomColor: (theme: Theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.300',
+            }}
           >
             <IconButton onClick={() => setTab(false)} sx={{ position: 'absolute', top: 8, right: 8 }}>
               <CloseIcon />

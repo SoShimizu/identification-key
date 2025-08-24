@@ -11,7 +11,7 @@ import { STR } from "../../../i18n";
 import { Taxon, Justification, MultiChoice, Choice } from "../../../api";
 import { GetJustificationForTaxon } from "../../../../wailsjs/go/main/App";
 import JustificationPanel from "./JustificationPanel";
-import { FormattedScientificName } from "../taxa/TaxonDetailPanel";
+import { FormattedTaxonName } from "../../common/FormattedTaxonName";
 
 export type EngineScore = {
   rank?: number;
@@ -22,6 +22,21 @@ export type EngineScore = {
   conflicts?: number;
   match?: number;
   support?: number;
+};
+
+// 修正：Propsの型定義をApp.tsxでの使用方法に合わせて修正
+type CandidatesPanelProps = {
+  title?: string;
+  rows: EngineScore[];
+  totalTaxa: number;
+  lang?: "ja" | "en";
+  algo: "bayes" | "heuristic";
+  comparisonList: string[];
+  setComparisonList: React.Dispatch<React.SetStateAction<string[]>>;
+  onCompareClick: () => void;
+  onTaxonSelect: (taxon: Taxon) => void;
+  selected: Record<string, Choice>;
+  selectedMulti: Record<string, MultiChoice>;
 };
 
 const ScoreCell = ({ score }: { score: number }) => (
@@ -41,19 +56,7 @@ export default function CandidatesPanel({
   title, rows, totalTaxa, lang = "ja", algo,
   comparisonList, setComparisonList, onCompareClick, onTaxonSelect,
   selected, selectedMulti
-}: {
-  title?: string;
-  rows: EngineScore[];
-  totalTaxa: number;
-  lang?: "ja" | "en";
-  algo: "bayes" | "heuristic";
-  comparisonList: string[];
-  setComparisonList: React.Dispatch<React.SetStateAction<string[]>>;
-  onCompareClick: () => void;
-  onTaxonSelect: (taxon: Taxon) => void;
-  selected: Record<string, Choice>;
-  selectedMulti: Record<string, MultiChoice>;
-}) {
+}: CandidatesPanelProps) { // 修正：型を適用
   const T = STR[lang].candidatesPanel;
   const [showMatchSupport, setShowMatchSupport] = useState<boolean>(false);
   
@@ -172,7 +175,7 @@ export default function CandidatesPanel({
                 </TableCell>
                 <TableCell>{r.rank ?? i + 1}</TableCell>
                 <TableCell>
-                  <FormattedScientificName taxon={r.taxon} lang={lang} />
+                  <FormattedTaxonName taxon={r.taxon} lang={lang} />
                 </TableCell>
                 <ScoreCell score={r.post ?? 0} />
                 <TableCell>{(r.delta ?? 0).toExponential(2)}</TableCell>

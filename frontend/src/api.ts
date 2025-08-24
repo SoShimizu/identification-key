@@ -53,6 +53,7 @@ export type Taxon = {
     id: string;
     name: string;
     scientificName: string;
+    rank?: string; // <-- 修正：この行を追加
     taxonAuthor?: string;
     vernacularName_en?: string;
     vernacularName_ja?: string;

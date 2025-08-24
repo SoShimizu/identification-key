@@ -65,6 +65,7 @@ type Taxon struct {
 	ID                string                     `json:"id"`   // From #TaxonID
 	Name              string                     `json:"name"` // For display, from ScientificName
 	ScientificName    string                     `json:"scientificName"`
+	Rank              string                     `json:"rank,omitempty"` // <-- この行を追加しました
 	TaxonAuthor       string                     `json:"taxonAuthor,omitempty"`
 	VernacularNameEN  string                     `json:"vernacularName_en,omitempty"`
 	VernacularNameJP  string                     `json:"vernacularName_ja,omitempty"`

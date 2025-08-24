@@ -72,7 +72,6 @@ const getInitialLang = (): 'ja' | 'en' => {
   return 'en'; // Default to English
 };
 
-// This hook now also manages language state to correctly construct TraitRows
 export function useMatrix(): UseMatrixReturn {
   const [lang, setLang] = useState<"ja" | "en">(getInitialLang);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
@@ -117,9 +116,7 @@ export function useMatrix(): UseMatrixReturn {
       await EnsureMyKeysAndSamples();
       const list = (await ListMyKeys()) as KeyInfo[];
       setKeys(list);
-      const cur = await GetCurrentKeyName().catch(() => "");
-      const found = list.find((k) => k.name === cur);
-      setActiveKey(found ? found.name : list[0]?.name ?? undefined);
+      // Don't automatically change the active key on refresh, just update the list
     } catch (error) {
       console.error("Failed to refresh keys:", error);
     }
@@ -154,8 +151,8 @@ export function useMatrix(): UseMatrixReturn {
       setMatrixName(m.name ?? "");
       setActiveKey((prev) => prev ?? m.name);
       
-      setHistory([]);
-      setHistoryIndex(-1);
+      setHistory([{ selected: {}, selectedMulti: {}, log: { traitName: "Initial State", selection: "", timestamp: Date.now() } }]);
+      setHistoryIndex(0);
       setScores([]);
       setSuggs([]);
       lastEvaluatedState.current = null;
@@ -170,8 +167,14 @@ export function useMatrix(): UseMatrixReturn {
   }, []);
 
   useEffect(() => {
-    loadMatrix();
-    refreshKeys();
+    const initialLoad = async () => {
+        await refreshKeys();
+        const cur = await GetCurrentKeyName().catch(() => "");
+        setActiveKey(cur);
+        await loadMatrix();
+    };
+    initialLoad();
+
     const unsubscribe = EventsOn("matrix_changed", loadMatrix);
     return () => { if (unsubscribe) unsubscribe(); };
   }, [loadMatrix, refreshKeys]);

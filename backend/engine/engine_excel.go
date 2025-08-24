@@ -39,8 +39,6 @@ func parseParentDependency(s string) *Dependency {
 	if requiredState == "" {
 		requiredState = matches[3]
 	}
-	// Note: ParentTraitID here is the user-provided ID or name, not the final canonical ID.
-	// It will be resolved later using the ID resolver map.
 	return &Dependency{ParentTraitID: matches[1], RequiredState: requiredState}
 }
 
@@ -327,6 +325,7 @@ func parseTaxaInfo(f *excelize.File) (map[string]*Taxon, error) {
 			ID:                taxonID,
 			Name:              name,
 			ScientificName:    name,
+			Rank:              cleanString(getCell(rows, r, header["#rank"])), // Read the new #Rank column
 			TaxonAuthor:       cleanString(getCell(rows, r, header["#author"])),
 			VernacularNameEN:  cleanString(getCell(rows, r, header["#vernacularname_en"])),
 			VernacularNameJP:  cleanString(getCell(rows, r, header["#vernacularname_ja"])),
@@ -360,7 +359,7 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 
 	headerMap := getHeaderMap(rows[0])
 
-	requiredHeaders := []string{"#trait_en", "#type"}
+	requiredHeaders := []string{"#type"}
 	for _, h := range requiredHeaders {
 		if _, ok := headerMap[h]; !ok {
 			return fmt.Errorf("required header '%s' not found in Traits sheet", h)
@@ -380,27 +379,35 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 		return errors.New("no matching taxonIDs found between Traits header and TaxaInfo sheet")
 	}
 
-	// --- Pass 1: Build TraitID resolver map ---
 	traitIDResolver := make(map[string]string)
 	usedCanonicalIDs := make(map[string]bool)
 
 	for r := 1; r < len(rows); r++ {
 		traitNameEN := cleanString(getCell(rows, r, headerMap["#trait_en"]))
-		if traitNameEN == "" {
+		traitNameJP := cleanString(getCell(rows, r, headerMap["#trait_ja"]))
+
+		traitIdentifier := traitNameEN
+		if traitIdentifier == "" {
+			traitIdentifier = traitNameJP
+		}
+		if traitIdentifier == "" {
 			continue
 		}
 
-		// --- Start of Modified Logic for Unique ID Generation ---
 		var canonicalTraitID string
 		userDefinedID := cleanString(getCell(rows, r, headerMap["#traitid"]))
 
 		if userDefinedID != "" {
 			canonicalTraitID = userDefinedID
 		} else {
-			sanitizedNameID := sanitizeToID(traitNameEN)
+			sanitizedNameID := sanitizeToID(traitIdentifier)
 			if _, exists := usedCanonicalIDs[sanitizedNameID]; exists {
-				// ID collision detected, prepend group name to make it unique.
-				groupName := cleanString(getCell(rows, r, headerMap["#group_en"]))
+				groupNameEN := cleanString(getCell(rows, r, headerMap["#group_en"]))
+				groupNameJP := cleanString(getCell(rows, r, headerMap["#group_jp"]))
+				groupName := groupNameEN
+				if groupName == "" {
+					groupName = groupNameJP
+				}
 				sanitizedGroupName := sanitizeToID(groupName)
 				canonicalTraitID = fmt.Sprintf("%s_%s", sanitizedGroupName, sanitizedNameID)
 				log.Printf("[EXCEL PARSER] Duplicate sanitized name '%s' found. Generated unique ID with group: '%s'", sanitizedNameID, canonicalTraitID)
@@ -408,12 +415,20 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 				canonicalTraitID = sanitizedNameID
 			}
 		}
-		usedCanonicalIDs[canonicalTraitID] = true
-		// --- End of Modified Logic ---
 
-		// Map the original sanitized name to the (potentially new) canonical ID for dependency resolution.
-		sanitizedNameID := sanitizeToID(traitNameEN)
+		if _, exists := usedCanonicalIDs[canonicalTraitID]; exists && userDefinedID != "" {
+			log.Printf("[EXCEL PARSER] Warning: Duplicate user-defined TraitID '%s' detected. This may cause issues with dependencies.", userDefinedID)
+		}
+		usedCanonicalIDs[canonicalTraitID] = true
+
+		sanitizedNameID := sanitizeToID(traitIdentifier)
 		traitIDResolver[sanitizedNameID] = canonicalTraitID
+		if traitNameEN != "" {
+			traitIDResolver[sanitizeToID(traitNameEN)] = canonicalTraitID
+		}
+		if traitNameJP != "" {
+			traitIDResolver[sanitizeToID(traitNameJP)] = canonicalTraitID
+		}
 
 		if userDefinedID != "" {
 			traitIDResolver[userDefinedID] = canonicalTraitID
@@ -421,32 +436,32 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 	}
 	log.Printf("[EXCEL PARSER] Pass 1 complete. Built TraitID resolver map with %d entries.", len(traitIDResolver))
 
-	// --- Pass 2: Process traits and resolve dependencies ---
 	for r := 1; r < len(rows); r++ {
 		traitNameEN := cleanString(getCell(rows, r, headerMap["#trait_en"]))
-		if traitNameEN == "" {
+		traitNameJP := cleanString(getCell(rows, r, headerMap["#trait_ja"]))
+
+		traitIdentifier := traitNameEN
+		if traitIdentifier == "" {
+			traitIdentifier = traitNameJP
+		}
+		if traitIdentifier == "" {
 			continue
 		}
 
-		// --- Start of Modified Logic for Unique ID Re-generation ---
 		var canonicalTraitID string
 		userDefinedID := cleanString(getCell(rows, r, headerMap["#traitid"]))
 
 		if userDefinedID != "" {
 			canonicalTraitID = userDefinedID
 		} else {
-			sanitizedNameID := sanitizeToID(traitNameEN)
-			// This logic MUST be identical to Pass 1 to ensure we get the same ID.
-			// We look up the final ID from the resolver map instead of re-calculating everything.
-			// This is safer.
+			sanitizedNameID := sanitizeToID(traitIdentifier)
 			resolvedID, ok := traitIDResolver[sanitizedNameID]
 			if !ok {
-				log.Printf("[EXCEL PARSER] FATAL: Could not find resolved ID for trait '%s' in Pass 2. This should not happen.", traitNameEN)
+				log.Printf("[EXCEL PARSER] FATAL: Could not find resolved ID for trait '%s' in Pass 2. This should not happen.", traitIdentifier)
 				continue
 			}
 			canonicalTraitID = resolvedID
 		}
-		// --- End of Modified Logic ---
 
 		var dependency *Dependency
 		depStr := cleanString(getCell(rows, r, headerMap["#dependency"]))
@@ -456,7 +471,6 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 				parentIdentifier := dep.ParentTraitID
 				resolvedParentID, ok := traitIDResolver[parentIdentifier]
 				if !ok {
-					// Fallback for cases where dependency is specified by name, not ID
 					resolvedParentID, ok = traitIDResolver[sanitizeToID(parentIdentifier)]
 				}
 
@@ -464,7 +478,7 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 					dep.ParentTraitID = resolvedParentID
 					dependency = dep
 				} else {
-					log.Printf("[EXCEL PARSER] Warning: Could not resolve dependency parent '%s' for trait '%s'. Dependency will be ignored.", parentIdentifier, traitNameEN)
+					log.Printf("[EXCEL PARSER] Warning: Could not resolve dependency parent '%s' for trait '%s'. Dependency will be ignored.", parentIdentifier, traitIdentifier)
 				}
 			}
 		}
@@ -475,7 +489,7 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 			ID:               fmt.Sprintf("t%04d", len(matrix.Traits)+1),
 			TraitID:          canonicalTraitID,
 			NameEN:           traitNameEN,
-			NameJP:           cleanString(getCell(rows, r, headerMap["#trait_ja"])),
+			NameJP:           traitNameJP,
 			GroupEN:          cleanString(getCell(rows, r, headerMap["#group_en"])),
 			GroupJP:          cleanString(getCell(rows, r, headerMap["#group_jp"])),
 			Type:             "",
@@ -520,16 +534,21 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 				childID := fmt.Sprintf("t%04d", len(matrix.Traits)+1)
 				derivedIDs[i] = childID
 				matrix.Traits = append(matrix.Traits, Trait{
-					ID:         childID,
-					TraitID:    fmt.Sprintf("%s_state%d", trait.TraitID, i),
-					NameEN:     fmt.Sprintf("%s = %s", trait.NameEN, st),
-					NameJP:     fmt.Sprintf("%s = %s", trait.NameJP, st),
-					GroupEN:    trait.GroupEN,
-					GroupJP:    trait.GroupJP,
-					Type:       "derived",
-					Parent:     trait.TraitID,
-					ParentName: trait.NameEN,
-					State:      st,
+					ID:      childID,
+					TraitID: fmt.Sprintf("%s_state%d", trait.TraitID, i),
+					NameEN:  fmt.Sprintf("%s = %s", trait.NameEN, st),
+					NameJP:  fmt.Sprintf("%s = %s", trait.NameJP, st),
+					GroupEN: trait.GroupEN,
+					GroupJP: trait.GroupJP,
+					Type:    "derived",
+					Parent:  trait.TraitID,
+					ParentName: func() string {
+						if trait.NameEN != "" {
+							return trait.NameEN
+						}
+						return trait.NameJP
+					}(),
+					State: st,
 				})
 			}
 

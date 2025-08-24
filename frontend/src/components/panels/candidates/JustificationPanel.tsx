@@ -10,6 +10,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import HelpIcon from '@mui/icons-material/Help';
 import { Taxon, Justification, JustificationItem } from '../../../api';
 import { STR } from '../../../i18n';
+import { FormattedTaxonName } from '../../common/FormattedTaxonName';
 
 type Props = {
     taxon: Taxon | null;
@@ -74,7 +75,13 @@ export default function JustificationPanel({ taxon, justification, loading, onCl
     return (
         <>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="h5" component="h2">{T.title_prefix} <strong>{taxon.name}</strong></Typography>
+                <Box>
+                    <Typography variant="h5" component="h2" sx={{ display: 'inline' }}>{T.title_prefix} </Typography>
+                    {/* Use the FormattedTaxonName component here */}
+                    <Box sx={{ display: 'inline-block', verticalAlign: 'bottom', ml: 1 }}>
+                         <FormattedTaxonName taxon={taxon} lang={lang} />
+                    </Box>
+                </Box>
                 <IconButton onClick={onClose}><CloseIcon /></IconButton>
             </Stack>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ my: 1 }}>

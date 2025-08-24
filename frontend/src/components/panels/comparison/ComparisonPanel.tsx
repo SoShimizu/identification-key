@@ -18,7 +18,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { Trait, Taxon } from "../../../api";
 import { STR } from "../../../i18n";
-import { FormattedScientificName } from "../taxa/TaxonDetailPanel";
+import { FormattedTaxonName } from "../../common/FormattedTaxonName";
 
 type Props = {
   lang: "ja" | "en";
@@ -106,7 +106,7 @@ export default function ComparisonPanel({ lang, allTraits, allTaxa, comparisonLi
               <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>{T.trait}</TableCell>
               {comparedTaxa.map(taxon => (
                 <TableCell key={taxon.id} sx={{ fontWeight: 'bold', minWidth: 150 }}>
-                    <FormattedScientificName taxon={taxon} lang={lang} />
+                    <FormattedTaxonName taxon={taxon} lang={lang} />
                 </TableCell>
               ))}
             </TableRow>

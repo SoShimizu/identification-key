@@ -24,7 +24,8 @@ export const STR = {
       switchMatrix: "マトリクス切替",
       refreshList: "一覧を再取得",
       description: "各設定タブから評価方法やパラメータを調整できます。設定はマトリクスごとに自動保存されます。",
-      diagnosticPanel: "診断パネル",
+        diagnosticPanel: "診断パネル",
+      refresh_keys: "マトリクス一覧を更新",
     },
     candidatesPanel: {
         header_rank: "#",
@@ -196,6 +197,7 @@ export const STR = {
         refreshList: "Refresh List",
         description: "You can adjust evaluation methods and parameters from the settings tabs. Settings are saved automatically for each matrix.",
         diagnosticPanel: "Diagnostic Panel",
+        refresh_keys: "Refresh matrix list",
     },
     candidatesPanel: {
         header_rank: "#",

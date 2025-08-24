@@ -4,8 +4,11 @@ import { Box, Typography, CircularProgress, Paper, Grid, Modal, IconButton, Tabs
 import CloseIcon from '@mui/icons-material/Close';
 import { Taxon } from '../../../api';
 import { GetHelpImage } from '../../../../wailsjs/go/main/App.js';
+// 修正：新しい共通コンポーネントをインポート
+import { FormattedTaxonName } from '../../common/FormattedTaxonName';
 
 const ImageWithLoader: React.FC<{ filename: string; onClick: () => void }> = ({ filename, onClick }) => {
+    // ... (このコンポーネントの中身は変更なし) ...
     const [imageData, setImageData] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -37,29 +40,7 @@ const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
     return <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, textAlign: 'left' }} dangerouslySetInnerHTML={{ __html: content }} />;
 };
 
-// Reusable component for displaying taxon names correctly
-export const FormattedScientificName: React.FC<{ taxon: Taxon, lang: 'ja' | 'en' }> = ({ taxon, lang }) => {
-    const genus = taxon.genus || '';
-    const subgenus = taxon.subgenus ? `(${taxon.subgenus})` : '';
-    const species = taxon.species || '';
-    const subspecies = taxon.subspecies || '';
-    
-    const vernacularName = lang === 'ja' ? taxon.vernacularName_ja || taxon.vernacularName_en : taxon.vernacularName_en || taxon.vernacularName_ja;
-
-    return (
-        <Box>
-            <Typography variant="body1" component="div">
-                {genus && <i>{genus} </i>}
-                {subgenus && <i>{subgenus} </i>}
-                {species && <i>{species} </i>}
-                {subspecies && <i>{subspecies} </i>}
-                {taxon.taxonAuthor && <Typography variant="body2" component="span">{taxon.taxonAuthor}</Typography>}
-            </Typography>
-            {vernacularName && <Typography variant="caption" color="text.secondary" sx={{display: 'block'}}>{vernacularName}</Typography>}
-        </Box>
-    );
-};
-
+// --- 修正：ファイル内にあったFormattedTaxonNameの定義は完全に削除 ---
 
 export default function TaxonDetailPanel({ taxon, lang }: { taxon: Taxon, lang: "ja" | "en" }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -108,7 +89,7 @@ export default function TaxonDetailPanel({ taxon, lang }: { taxon: Taxon, lang: 
     <>
       <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{flexShrink: 0}}>
-            <FormattedScientificName taxon={taxon} lang={lang} />
+            <FormattedTaxonName taxon={taxon} lang={lang} typographyVariant="h6" />
         </Box>
         <Divider sx={{ my: 1, flexShrink: 0 }} />
         
