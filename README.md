@@ -1,6 +1,11 @@
 # MyKeyLogue
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)
+![Wails](https://img.shields.io/badge/Wails-v2-8A2BE2)
+![Platforms](https://img.shields.io/badge/Platforms-Windows%20|%20macOS%20|%20Linux-2ea44f)
 
 **EN:** A cross-platform desktop application for interactive multi-access taxonomic keys powered by statistical algorithms.  
 **JP:** 統計アルゴリズムを用いた**対話型マルチアクセス検索表**のためのクロスプラットフォーム・デスクトップアプリです。
