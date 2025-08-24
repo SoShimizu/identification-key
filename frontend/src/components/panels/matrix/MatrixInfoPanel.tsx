@@ -8,12 +8,16 @@ type Props = {
     lang: 'ja' | 'en';
 };
 
-const InfoRow: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => {
+const HtmlRenderer: React.FC<{ content: string, component?: React.ElementType, variant?: string }> = ({ content, component, variant }) => {
+    return <Typography variant={variant as any || "body2"} component={component || "div"} sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: content }} />;
+};
+
+const InfoRow: React.FC<{ label: string; value?: string | null; isHtml?: boolean }> = ({ label, value, isHtml }) => {
     if (!value) return null;
     return (
         <Box sx={{ mb: 2 }}>
             <Typography variant="overline" color="text.secondary" component="div">{label}</Typography>
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{value}</Typography>
+            {isHtml ? <HtmlRenderer content={value} /> : <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{value}</Typography>}
         </Box>
     );
 };
@@ -45,7 +49,11 @@ export default function MatrixInfoPanel({ info, lang }: Props) {
     return (
         <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{flexShrink: 0}}>
-                <Typography variant="h6">{isJa ? info.title_jp || info.title_en : info.title_en || info.title_jp}</Typography>
+                <HtmlRenderer
+                    content={isJa ? info.title_jp || info.title_en : info.title_en || info.title_jp}
+                    variant="h6"
+                    component="h2"
+                />
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                     Version: {info.version}
                 </Typography>
@@ -60,14 +68,14 @@ export default function MatrixInfoPanel({ info, lang }: Props) {
             )}
 
             <Box sx={{ flex: 1, overflowY: 'auto', pt: 2 }}>
-                {tabs[activeTab] === (isJa ? "解説" : "Description") && <InfoRow label="" value={description} />}
+                {tabs[activeTab] === (isJa ? "解説" : "Description") && <InfoRow label="" value={description} isHtml />}
                 {tabs[activeTab] === (isJa ? "著者と引用" : "Authors & Citation") && (
                     <>
                         <InfoRow label={isJa ? "著者" : "Authors"} value={authors} />
-                        <InfoRow label={isJa ? "引用" : "Citation"} value={citation} />
+                        <InfoRow label={isJa ? "引用" : "Citation"} value={citation} isHtml />
                     </>
                 )}
-                {tabs[activeTab] === (isJa ? "参考文献" : "References") && <InfoRow label="" value={references} />}
+                {tabs[activeTab] === (isJa ? "参考文献" : "References") && <InfoRow label="" value={references} isHtml />}
             </Box>
         </Paper>
     );

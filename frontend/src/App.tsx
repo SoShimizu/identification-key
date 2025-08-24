@@ -48,7 +48,7 @@ export default function App() {
   
   const [leftPanelWidth, setLeftPanelWidth] = useState(35);
   const [leftTopPanelHeight, setLeftTopPanelHeight] = useState(40);
-  const [rightTopPanelHeight, setRightTopPanelHeight] = useState(50);
+  const [rightTopPanelHeight, setRightTopPanelHeight] = useState(40);
 
   const handleMouseDownX = (e: React.MouseEvent) => {
       e.preventDefault();

@@ -85,7 +85,7 @@ export default function CandidatesPanel({
       setJustificationOpen(true);
       setCurrentTargetTaxon(taxon);
       try {
-          const result = await GetJustificationForTaxon(taxon.id, selected, selectedMulti);
+          const result = await GetJustificationForTaxon(taxon.id, selected, selectedMulti, lang);
           setCurrentJustification(result as Justification);
       } catch (error) {
           console.error("Failed to get justification:", error);
@@ -131,7 +131,7 @@ export default function CandidatesPanel({
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
-                <Tooltip title={isAllSelected ? "Deselect All" : "Select All"}>
+                <Tooltip title={isAllSelected ? T.deselect_all : T.select_all}>
                   <Checkbox
                       indeterminate={numSelected > 0 && numSelected < rowCount}
                       checked={isAllSelected}
@@ -146,7 +146,7 @@ export default function CandidatesPanel({
               <TableCell sx={{ width: 80 }}><Tooltip title={T.tooltip_delta}><span>{T.header_delta}</span></Tooltip></TableCell>
               <TableCell sx={{ width: 70 }} align="center"><Tooltip title={<Typography sx={{whiteSpace: 'pre-line'}}>{T.tooltip_conflicts}</Typography>}><span>{T.header_conflicts}</span></Tooltip></TableCell>
               {showMatchSupport && <TableCell sx={{ width: 110 }}><Tooltip title={<Typography sx={{whiteSpace: 'pre-line'}}>{T.tooltip_match_support}</Typography>}><span>{T.header_match_support}</span></Tooltip></TableCell>}
-              <TableCell sx={{ width: 50 }} align="center">Why?</TableCell>
+              <TableCell sx={{ width: 50 }} align="center">{T.header_why}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -185,7 +185,7 @@ export default function CandidatesPanel({
                 </TableCell>
                 {showMatchSupport && <TableCell>{`${r.match ?? 0}/${r.support ?? 0}`}</TableCell>}
                 <TableCell align="center">
-                    <Tooltip title={`Why is ${r.taxon?.name} ranked here?`}>
+                    <Tooltip title={`${T.tooltip_why_prefix} ${r.taxon?.name}`}>
                         <span>
                         <IconButton size="small" onClick={(e) => handleWhyClick(e, r.taxon)} disabled={!selected || Object.keys(selected).length === 0 && Object.keys(selectedMulti).length === 0}>
                             <HelpOutlineIcon fontSize="small"/>

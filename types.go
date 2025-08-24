@@ -84,4 +84,5 @@ type ReportRequest struct {
 	Options     ApplyOptions        `json:"options"`
 	History     []HistoryItem       `json:"history"`
 	FinalScores []engine.TaxonScore `json:"finalScores"`
+	MatrixInfo  engine.MatrixInfo   `json:"matrixInfo"`
 }

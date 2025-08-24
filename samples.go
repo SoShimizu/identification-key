@@ -1,217 +1,151 @@
-// samples.go
+// backend/samples.go
 package main
 
 import (
 	"bytes"
-	"fmt"
 	"image"
 	"image/color"
 	"image/png"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
 
 // ---- サンプル共通ヘルパ ----
 
-func fmtCell(col, row int) string {
-	cell, _ := excelize.CoordinatesToCellName(col, row)
-	return cell
-}
-
-func species10() []string {
-	return []string{
-		"Species 01", "Species 02", "Species 03", "Species 04", "Species 05",
-		"Species 06", "Species 07", "Species 08", "Species 09", "Species 10",
-	}
-}
-
-// Group, Trait, Type
-func traits20() [][3]string {
-	return [][3]string{
-		{"Head", "Antenna long", "binary"},
-		{"Head", "Clypeus convex", "binary"},
-		{"Head", "Interocellar area black", "binary"},
-		{"Thorax", "Mesoscutum infuscate", "binary"},
-		{"Thorax", "Mesopleuron densely punctate", "binary"},
-		{"Legs", "Hind tarsal claw uniformly pectinate", "binary"},
-		{"Legs", "Proximal pectin absent", "binary"},
-		{"Wings", "Fore wing fenestra central sclerite", "binary"},
-		{"Wings", "Distal sclerite confluent with proximal", "binary"},
-		{"Wings", "Marginal cell widely glabrous proximally", "binary"},
-		{"Abdomen", "Metasomal posterior segments black", "binary"},
-		{"Abdomen", "Propodeum posterior area strongly shiny", "binary"},
-		{"Ecology", "Nocturnal", "binary"},
-		{"Ecology", "Large fore wing (>20mm)", "binary"},
-		// mixed 用（v2での型バリエーションの見本）
-		{"Head", "Mandible torsion", "ordinal(low<mid<high)"},
-		{"Wings", "Wing darkness", "ordinal(pale<moderate<dark)"},
-		{"Color", "Body color", "nominal(orange|brown|black)"},
-		{"Ecology", "Distribution", "categorical_multi"}, // New Type
-		{"Wings", "Fore wing length (mm)", "continuous"},
-		{"Abdomen", "T7 spot area ratio", "continuous"},
-	}
-}
-
-func demoTernaryValue(traitIndex, taxonIndex int) string {
-	// それっぽいパターンで -1/0/1 を配る（デモ用）
-	switch {
-	case (traitIndex+taxonIndex)%7 == 0:
-		return "0"
-	case (traitIndex+2*taxonIndex)%3 == 0:
-		return "-1"
-	case (2*traitIndex+taxonIndex)%5 == 0:
-		return "0"
-	default:
-		if (traitIndex+taxonIndex)%2 == 0 {
-			return "1"
+func writeSheet(f *excelize.File, sheetName string, data [][]string) {
+	for r, rowData := range data {
+		for c, cellData := range rowData {
+			cell, _ := excelize.CoordinatesToCellName(c+1, r+1)
+			f.SetCellValue(sheetName, cell, cellData)
 		}
-		return "-1"
 	}
 }
 
-// ---- ① v2: binary（10種×binary形質） ----
-
-func writeSampleBinaryV2(outpath string) error {
+// ---- ① 日本のサクラ サンプル ----
+func writeSampleSakura(outpath string) error {
 	f := excelize.NewFile()
-	sh := "Matrix"
-	f.SetSheetName(f.GetSheetName(0), sh)
+	f.DeleteSheet("Sheet1")
 
-	header := append([]string{"#Group", "#Trait", "#Type"}, species10()...)
-	for i, v := range header {
-		_ = f.SetCellStr(sh, fmtCell(i+1, 1), v)
-	}
+	// MatrixInfo
+	f.NewSheet("MatrixInfo")
+	writeSheet(f, "MatrixInfo", [][]string{
+		{"title_ja", "日本のサクラ（簡易版）"},
+		{"title_en", "Chery Blossoms in Japan (Simple ver.)"},
+		{"version", "1.0"},
+		{"authors_jp", "MyKeyLogue サンプル"},
+	})
 
-	trows := traits20()
-	row := 2
-	for r, trip := range trows {
-		if trip[2] != "binary" {
-			continue
-		}
-		_ = f.SetCellStr(sh, fmtCell(1, row), trip[0])
-		_ = f.SetCellStr(sh, fmtCell(2, row), trip[1])
-		_ = f.SetCellStr(sh, fmtCell(3, row), "binary")
-		for c := 0; c < 10; c++ {
-			val := demoTernaryValue(r, c)
-			_ = f.SetCellStr(sh, fmtCell(4+c, row), val)
-		}
-		row++
-	}
+	// TaxaInfo
+	f.NewSheet("TaxaInfo")
+	writeSheet(f, "TaxaInfo", [][]string{
+		{"#TaxonID", "#ScientificName", "#VernacularName_ja"},
+		{"cerasus_jamasakura", "Cerasus jamasakura", "ヤマザクラ"},
+		{"cerasus_itosakura", "Cerasus itosakura", "エドヒガン"},
+		{"cerasus_speciosa", "Cerasus speciosa", "オオシマザクラ"},
+	})
 
-	if err := os.MkdirAll(filepath.Dir(outpath), 0o755); err != nil {
-		return err
-	}
+	// Traits
+	f.NewSheet("Traits")
+	writeSheet(f, "Traits", [][]string{
+		{"#Trait_ja", "#Trait_en", "#Group_ja", "#Group_en", "#Type", "cerasus_jamasakura", "cerasus_itosakura", "cerasus_speciosa"},
+		{"葉より先に花が咲く", "Flowers bloom before leaves", "花と葉", "Flower & Leaf", "binary", "-1", "1", "1"},
+		{"葉柄に蜜腺がある", "Nectar glands on petiole", "花と葉", "Flower & Leaf", "binary", "1", "-1", "1"},
+		{"萼筒（がくづつ）が無毛", "Calyx tube is glabrous", "花", "Flower", "binary", "1", "-1", "1"},
+		{"萼筒が壺形", "Calyx tube is urn-shaped", "花", "Flower", "binary", "-1", "1", "-1"},
+	})
+
 	return f.SaveAs(outpath)
 }
 
-// ---- ② v2: mixed（binary + ordinal/nominal/continuous/categorical_multi） ----
-func writeSampleMixedV2(outpath string) error {
+// ---- ② 日本のカラス サンプル ----
+func writeSampleKarasu(outpath string) error {
 	f := excelize.NewFile()
-	sh := "Matrix"
-	f.SetSheetName(f.GetSheetName(0), sh)
+	f.DeleteSheet("Sheet1")
 
-	header := append([]string{"#Group", "#Trait", "#Type", "#Difficulty", "#Risk", "#HelpText", "#HelpImages"}, species10()...)
-	for i, v := range header {
-		_ = f.SetCellStr(sh, fmtCell(i+1, 1), v)
-	}
+	// MatrixInfo & TaxaInfo
+	f.NewSheet("MatrixInfo")
+	writeSheet(f, "MatrixInfo", [][]string{
+		{"title_ja", "日本のカラス"}, {"version", "1.0"},
+	})
+	f.NewSheet("TaxaInfo")
+	writeSheet(f, "TaxaInfo", [][]string{
+		{"#TaxonID", "#ScientificName", "#VernacularName_ja"},
+		{"corvus_corone", "Corvus corone", "ハシボソガラス"},
+		{"corvus_macrorhynchos", "Corvus macrorhynchos", "ハシブトガラス"},
+	})
 
-	trows := traits20()
-	row := 2
-	for r, trip := range trows {
-		_ = f.SetCellStr(sh, fmtCell(1, row), trip[0]) // #Group
-		_ = f.SetCellStr(sh, fmtCell(2, row), trip[1]) // #Trait
-		_ = f.SetCellStr(sh, fmtCell(3, row), trip[2]) // #Type
+	// Traits
+	f.NewSheet("Traits")
+	writeSheet(f, "Traits", [][]string{
+		{"#Trait_ja", "#Group_ja", "#Type", "corvus_corone", "corvus_macrorhynchos"},
+		{"くちばしが細い", "形態", "binary", "1", "-1"},
+		{"おでこが出っ張っていない", "形態", "binary", "1", "-1"},
+		{"鳴き声が「カーカー」と澄んでいる", "生態", "binary", "1", "-1"},
+		{"鳴き声が「カァーカァー」と濁っている", "生態", "binary", "-1", "1"},
+		{"主に畑や河原にいる", "生態", "binary", "1", "-1"},
+		{"主に森林や市街地にいる", "生態", "binary", "-1", "1"},
+	})
 
-		// Add some dummy metadata for difficulty/risk/help
-		_ = f.SetCellStr(sh, fmtCell(4, row), "Normal")
-		_ = f.SetCellStr(sh, fmtCell(5, row), "Low")
-		_ = f.SetCellStr(sh, fmtCell(6, row), fmt.Sprintf("This is a help text for %s.", trip[1]))
-
-		// MODIFIED: Add sample image to a few traits
-		if r == 0 || r == 7 { // Add to "Antenna long" and "Fore wing fenestra..."
-			_ = f.SetCellStr(sh, fmtCell(7, row), "sample_image.png")
-		} else {
-			_ = f.SetCellStr(sh, fmtCell(7, row), "") // #HelpImages
-		}
-
-		colOffset := 8 // Data starts from the 8th column now
-		switch trip[2] {
-		case "binary":
-			for c := 0; c < 10; c++ {
-				val := demoTernaryValue(r, c)
-				_ = f.SetCellStr(sh, fmtCell(colOffset+c, row), val)
-			}
-		case "ordinal(low<mid<high)":
-			states := []string{"low", "mid", "high"}
-			for c := 0; c < 10; c++ {
-				_ = f.SetCellStr(sh, fmtCell(colOffset+c, row), states[(r+c)%3])
-			}
-		case "nominal(orange|brown|black)":
-			states := []string{"orange", "brown", "black"}
-			for c := 0; c < 10; c++ {
-				_ = f.SetCellStr(sh, fmtCell(colOffset+c, row), states[(2*r+c)%3])
-			}
-		case "continuous":
-			for c := 0; c < 10; c++ {
-				val := 10.0 + float64((r*3+c)%12) + 0.1*float64((r+c)%9)
-				_ = f.SetCellFloat(sh, fmtCell(colOffset+c, row), val, 2, 64)
-			}
-		case "categorical_multi":
-			// Example: Distribution data
-			dists := [][]string{
-				{"Japan", "Korea"},
-				{"Japan", "Taiwan", "China"},
-				{"China"},
-				{"Korea", "Taiwan"},
-				{"Japan"},
-				{"Taiwan"},
-				{"Japan", "China"},
-				{"Korea"},
-				{"China", "Taiwan"},
-				{"Japan", "Korea", "Taiwan"},
-			}
-			for c := 0; c < 10; c++ {
-				// Join with semicolon
-				_ = f.SetCellStr(sh, fmtCell(colOffset+c, row), strings.Join(dists[(r+c)%10], "; "))
-			}
-		}
-		row++
-	}
-
-	if err := os.MkdirAll(filepath.Dir(outpath), 0o755); err != nil {
-		return err
-	}
 	return f.SaveAs(outpath)
 }
 
-// ---- ③ 小さめ v2（UI検証用） ----
-
-func writeSampleSmallV2(outpath string) error {
+// ---- ③ 日本の哺乳類 サンプル ----
+func writeSampleHonyurui(outpath string) error {
 	f := excelize.NewFile()
-	sh := "Matrix"
-	f.SetSheetName(f.GetSheetName(0), sh)
+	f.DeleteSheet("Sheet1")
 
-	header := []string{"#Group", "#Trait", "#Type", "A sp.", "B sp.", "C sp."}
-	for i, v := range header {
-		_ = f.SetCellStr(sh, fmtCell(i+1, 1), v)
-	}
+	f.NewSheet("MatrixInfo")
+	writeSheet(f, "MatrixInfo", [][]string{
+		{"title_ja", "日本の哺乳類（齧歯目と翼手目）"}, {"version", "1.0"},
+	})
+	f.NewSheet("TaxaInfo")
+	writeSheet(f, "TaxaInfo", [][]string{
+		{"#TaxonID", "#ScientificName", "#VernacularName_ja"},
+		{"rattus_rattus", "Rattus rattus", "クマネズミ"},
+		{"mus_musculus", "Mus musculus", "ハツカネズミ"},
+		{"pipistrellus_abramus", "Pipistrellus abramus", "アブラコウモリ"},
+	})
 
-	rows := [][]string{
-		{"Head", "Antenna long", "binary", "1", "0", "-1"},
-		{"Wings", "Central sclerite", "binary", "1", "1", "0"},
-		{"Abdomen", "Posterior segments black", "binary", "0", "1", "0"},
-	}
-	for r, rowData := range rows {
-		for c, v := range rowData {
-			_ = f.SetCellStr(sh, fmtCell(c+1, r+2), v)
-		}
-	}
+	// Traits
+	f.NewSheet("Traits")
+	writeSheet(f, "Traits", [][]string{
+		{"#Trait_ja", "#Group_ja", "#Type", "#HelpText_ja", "rattus_rattus", "mus_musculus", "pipistrellus_abramus"},
+		{"翼がある", "形態", "binary", "", "-1", "-1", "1"},
+		{"体長が15cm以上", "形態", "binary", "頭から尾の付け根までの長さ", "1", "-1", "-1"},
+		{"尾が体長より長い", "形態", "binary", "", "1", "-1", "NA"},
+		{"体重 (g)", "形態", "continuous", "", "150-250", "15-30", "5-10"},
+	})
+	return f.SaveAs(outpath)
+}
 
-	if err := os.MkdirAll(filepath.Dir(outpath), 0o755); err != nil {
-		return err
-	}
+// ---- ④ 日本のスズメバチ サンプル ----
+func writeSampleSuzumebachi(outpath string) error {
+	f := excelize.NewFile()
+	f.DeleteSheet("Sheet1")
+
+	f.NewSheet("MatrixInfo")
+	writeSheet(f, "MatrixInfo", [][]string{
+		{"title_ja", "日本のスズメバチ（Vespa属）"}, {"version", "1.0"},
+	})
+	f.NewSheet("TaxaInfo")
+	writeSheet(f, "TaxaInfo", [][]string{
+		{"#TaxonID", "#ScientificName", "#VernacularName_ja"},
+		{"vespa_mandarinia", "Vespa mandarinia", "オオスズメバチ"},
+		{"vespa_crabro", "Vespa crabro", "モンスズメバチ"},
+		{"vespa_simillima", "Vespa simillima", "キイロスズメバチ"},
+		{"vespa_velutina", "Vespa velutina", "ツマアカスズメバチ"},
+	})
+
+	// Traits
+	f.NewSheet("Traits")
+	writeSheet(f, "Traits", [][]string{
+		{"#TraitID", "#Dependency", "#Trait_ja", "#Group_ja", "#Type", "#HelpText_ja", "vespa_mandarinia", "vespa_crabro", "vespa_simillima", "vespa_velutina"},
+		{"head_large", "", "頭部が大きい (頭幅5mm以上)", "形態", "binary", "女王で比較", "1", "-1", "-1", "-1"},
+		{"head_color", "", "頭楯の色", "形態", "nominal_parent(黄色|橙色)", "", "黄色", "黄色", "黄色", "橙色"},
+		{"body_color", "", "腹部の色彩", "生態", "categorical_multi", "腹部末端の節の色。複数選択可。", "黄;黒", "黄;赤;黒", "黄;黒", "橙;黒"},
+		{"nest_closed", "", "巣が外皮に覆われるか", "生態", "binary", "巣盤が露出しているか否か", "1", "0", "1", "1"},
+		{"nest_loc_closed", "nest_closed=1", "巣の場所 (閉鎖空間)", "生態", "binary", "樹洞や屋根裏など", "1", "NA", "1", "0"},
+	})
 	return f.SaveAs(outpath)
 }
 

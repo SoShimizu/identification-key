@@ -6,7 +6,12 @@ type reportStrings struct {
 	Title                string
 	ReportID             string
 	Date                 string
+	MatrixInfoTitle      string
 	MatrixFile           string
+	MatrixTitle          string
+	MatrixVersion        string
+	MatrixAuthors        string
+	MatrixCitation       string
 	Algorithm            string
 	ParametersUsed       string
 	Alpha                string
@@ -26,10 +31,11 @@ type reportStrings struct {
 	MatchSupportHeader   string
 	AndMore              string
 	ConfidenceTitle      string
+	ConfidenceDisclaimer string // 追加
 	ConfidenceHigh       string
 	ConfidenceVeryHigh   string
 	ConfidenceAbsolute   string
-	ConfidenceContested  string // RENAMED
+	ConfidenceContested  string
 	ConfidenceNA         string
 	CitationTitle        string
 	CitationText         string
@@ -44,7 +50,12 @@ func getReportStrings(lang string) reportStrings {
 			Title:                "MyKeyLogue 同定レポート",
 			ReportID:             "レポートID",
 			Date:                 "日時",
-			MatrixFile:           "マトリクスファイル",
+			MatrixInfoTitle:      "マトリクス情報",
+			MatrixFile:           "ファイル名",
+			MatrixTitle:          "タイトル",
+			MatrixVersion:        "バージョン",
+			MatrixAuthors:        "作成者",
+			MatrixCitation:       "引用",
 			Algorithm:            "アルゴリズム",
 			ParametersUsed:       "使用したパラメータ",
 			Alpha:                "偽陽性率 (α)",
@@ -64,6 +75,7 @@ func getReportStrings(lang string) reportStrings {
 			MatchSupportHeader:   "一致/適用",
 			AndMore:              "...他 %d 件",
 			ConfidenceTitle:      "同定の信頼度",
+			ConfidenceDisclaimer: "注意: この信頼度評価は、現在使用しているマトリクスに含まれる分類群のみを対象とした相対的なものです。候補にない種である可能性も常に考慮してください。",
 			ConfidenceHigh:       "高い (1位の候補は2位より %.2f倍確からしい)",
 			ConfidenceVeryHigh:   "非常に高い (2位以下の候補の確率は0です)",
 			ConfidenceAbsolute:   "決定的 (候補は1つに絞り込まれました)",
@@ -80,7 +92,12 @@ func getReportStrings(lang string) reportStrings {
 		Title:                "MyKeyLogue Identification Report",
 		ReportID:             "Report ID",
 		Date:                 "Date",
-		MatrixFile:           "Matrix File",
+		MatrixInfoTitle:      "Matrix Information",
+		MatrixFile:           "File",
+		MatrixTitle:          "Title",
+		MatrixVersion:        "Version",
+		MatrixAuthors:        "Authors",
+		MatrixCitation:       "Citation",
 		Algorithm:            "Algorithm",
 		ParametersUsed:       "Parameters Used",
 		Alpha:                "False Positive Rate (α)",
@@ -100,6 +117,7 @@ func getReportStrings(lang string) reportStrings {
 		MatchSupportHeader:   "Match/Sup.",
 		AndMore:              "...and %d more.",
 		ConfidenceTitle:      "Identification Confidence",
+		ConfidenceDisclaimer: "Note: This confidence assessment is relative and only considers taxa included in the current matrix. Always consider the possibility that the specimen may belong to a taxon not present in this key.",
 		ConfidenceHigh:       "High (Top candidate is %.2fx more likely than the second)",
 		ConfidenceVeryHigh:   "Very High (Second candidate has a probability of zero)",
 		ConfidenceAbsolute:   "Conclusive (Only one candidate remains)",

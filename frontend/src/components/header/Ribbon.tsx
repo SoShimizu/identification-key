@@ -62,7 +62,7 @@ export default function Ribbon(props: RibbonProps) {
           </Typography>
 
           <Tabs value={tab} onChange={(_, v: TabKey | false) => setTab(v)} onMouseLeave={() => setTab(false)} textColor="inherit" indicatorColor="primary" sx={{ minHeight: 48 }}>
-            <Tab onMouseEnter={() => setTab("welcome")} icon={<HomeIcon />} value="welcome" sx={{minWidth: 'auto', px: 2}} />
+            <Tab onMouseEnter={() => setTab("welcome")} icon={<HomeIcon />} iconPosition="start" label={T.ribbon.welcome} value="welcome" />
             <Tab onMouseEnter={() => setTab("settings")} icon={<SettingsIcon />} iconPosition="start" label={T.ribbon.settings} value="settings" />
           </Tabs>
 

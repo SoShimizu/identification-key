@@ -46,17 +46,15 @@ export const FormattedScientificName: React.FC<{ taxon: Taxon, lang: 'ja' | 'en'
     
     const vernacularName = lang === 'ja' ? taxon.vernacularName_ja || taxon.vernacularName_en : taxon.vernacularName_en || taxon.vernacularName_ja;
 
-    const nameParts = [genus, subgenus, species, subspecies].filter(Boolean);
-    const scientificNameMain = nameParts.map((part, index) => (
-        <i key={index} style={{marginRight: '0.25em'}}>{part}</i>
-    ));
-
     return (
         <Box>
-            <Typography variant="body1" component="div" sx={{ fontStyle: 'italic', display: 'inline-block' }}>
-                {scientificNameMain}
+            <Typography variant="body1" component="div">
+                {genus && <i>{genus} </i>}
+                {subgenus && <i>{subgenus} </i>}
+                {species && <i>{species} </i>}
+                {subspecies && <i>{subspecies} </i>}
+                {taxon.taxonAuthor && <Typography variant="body2" component="span">{taxon.taxonAuthor}</Typography>}
             </Typography>
-            {taxon.taxonAuthor && <Typography variant="body2" component="span" sx={{ ml: 1 }}>{taxon.taxonAuthor}</Typography>}
             {vernacularName && <Typography variant="caption" color="text.secondary" sx={{display: 'block'}}>{vernacularName}</Typography>}
         </Box>
     );
@@ -73,8 +71,8 @@ export default function TaxonDetailPanel({ taxon, lang }: { taxon: Taxon, lang: 
   const tabs = [];
   if (description) tabs.push(lang === 'ja' ? "解説" : "Description");
   tabs.push(lang === 'ja' ? "分類" : "Taxonomy");
-  if (references) tabs.push(lang === 'ja' ? "文献" : "References");
   if (taxon.images && taxon.images.length > 0 && taxon.images.filter(img => img.trim() !== "").length > 0) tabs.push(lang === 'ja' ? "画像" : "Images");
+  if (references) tabs.push(lang === 'ja' ? "文献" : "References");
 
   const [activeTab, setActiveTab] = useState(0);
 

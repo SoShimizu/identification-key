@@ -30,6 +30,11 @@ func (a *App) EnsureMyKeysAndSamples() error {
 	if err := os.MkdirAll(materialsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create help_materials directory: %w", err)
 	}
+	// Create reports directory
+	reportsDir := filepath.Join(a.basePath, "my_identification_reports")
+	if err := os.MkdirAll(reportsDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create my_identification_reports directory: %w", err)
+	}
 
 	sampleImagePath := filepath.Join(materialsDir, "sample_image.png")
 	if _, err := os.Stat(sampleImagePath); os.IsNotExist(err) {
@@ -53,15 +58,20 @@ func (a *App) EnsureMyKeysAndSamples() error {
 		return nil
 	}
 
-	if err := writeSampleBinaryV2(filepath.Join(a.keysDir, "Binary_v2_demo.xlsx")); err != nil {
+	// --- NEW: Write updated samples ---
+	if err := writeSampleSakura(filepath.Join(a.keysDir, "Sample_Sakura.xlsx")); err != nil {
 		return err
 	}
-	if err := writeSampleMixedV2(filepath.Join(a.keysDir, "Mixed_v2_demo.xlsx")); err != nil {
+	if err := writeSampleKarasu(filepath.Join(a.keysDir, "Sample_Karasu.xlsx")); err != nil {
 		return err
 	}
-	if err := writeSampleSmallV2(filepath.Join(a.keysDir, "Small_v2_demo.xlsx")); err != nil {
+	if err := writeSampleHonyurui(filepath.Join(a.keysDir, "Sample_Honyurui.xlsx")); err != nil {
 		return err
 	}
+	if err := writeSampleSuzumebachi(filepath.Join(a.keysDir, "Sample_Suzumebachi.xlsx")); err != nil {
+		return err
+	}
+
 	runtime.LogInfo(a.ctx, "[EnsureMyKeysAndSamples] demo keys written")
 	return nil
 }
@@ -215,14 +225,38 @@ func (a *App) GenerateIdentificationReport(req ReportRequest, path string) error
 	sb.WriteString("==================================================\n\n")
 	sb.WriteString(fmt.Sprintf("%s: %s\n", s.ReportID, uuid.New().String()))
 	sb.WriteString(fmt.Sprintf("%s: %s\n", s.Date, time.Now().Format("2006-01-02 15:04:05 MST")))
-	sb.WriteString(fmt.Sprintf("%s: %s\n", s.MatrixFile, req.MatrixName))
-	sb.WriteString(fmt.Sprintf("%s: %s\n", s.Algorithm, req.Algorithm))
+	sb.WriteString("\n")
+
+	// Matrix Info
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("%s\n", s.MatrixInfoTitle))
+	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixFile, req.MatrixName))
+	matrixTitle := req.MatrixInfo.TitleEN
+	if req.Lang == "ja" && req.MatrixInfo.TitleJP != "" {
+		matrixTitle = req.MatrixInfo.TitleJP
+	}
+	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixTitle, matrixTitle))
+	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixVersion, req.MatrixInfo.Version))
+	matrixAuthors := req.MatrixInfo.AuthorsEN
+	if req.Lang == "ja" && req.MatrixInfo.AuthorsJP != "" {
+		matrixAuthors = req.MatrixInfo.AuthorsJP
+	}
+	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixAuthors, matrixAuthors))
+	matrixCitation := req.MatrixInfo.CitationEN
+	if req.Lang == "ja" && req.MatrixInfo.CitationJP != "" {
+		matrixCitation = req.MatrixInfo.CitationJP
+	}
+	if matrixCitation != "" {
+		sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixCitation, matrixCitation))
+	}
 	sb.WriteString("\n")
 
 	// Parameters
 	sb.WriteString("--------------------------------------------------\n")
 	sb.WriteString(fmt.Sprintf("%s\n", s.ParametersUsed))
 	sb.WriteString("--------------------------------------------------\n")
+	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.Algorithm, req.Algorithm))
 	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Alpha, req.Options.DefaultAlphaFP))
 	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Beta, req.Options.DefaultBetaFN))
 	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Gamma, req.Options.GammaNAPenalty))
@@ -298,6 +332,7 @@ func (a *App) GenerateIdentificationReport(req ReportRequest, path string) error
 	sb.WriteString(fmt.Sprintf("%s\n", s.ConfidenceTitle))
 	sb.WriteString("--------------------------------------------------\n")
 	sb.WriteString(fmt.Sprintf("  %s\n\n", confidence))
+	sb.WriteString(fmt.Sprintf("  %s\n\n", s.ConfidenceDisclaimer))
 
 	// Citation Note
 	sb.WriteString("--------------------------------------------------\n")

@@ -580,6 +580,7 @@ export namespace main {
 	    options: ApplyOptions;
 	    history: HistoryItem[];
 	    finalScores: engine.TaxonScore[];
+	    matrixInfo: engine.MatrixInfo;
 	
 	    static createFrom(source: any = {}) {
 	        return new ReportRequest(source);
@@ -593,6 +594,7 @@ export namespace main {
 	        this.options = this.convertValues(source["options"], ApplyOptions);
 	        this.history = this.convertValues(source["history"], HistoryItem);
 	        this.finalScores = this.convertValues(source["finalScores"], engine.TaxonScore);
+	        this.matrixInfo = this.convertValues(source["matrixInfo"], engine.MatrixInfo);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

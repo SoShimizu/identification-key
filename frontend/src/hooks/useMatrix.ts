@@ -56,9 +56,25 @@ type UseMatrixReturn = {
   setLang: Dispatch<SetStateAction<"ja" | "en">>;
 };
 
+const getInitialLang = (): 'ja' | 'en' => {
+  try {
+    const storedLang = localStorage.getItem('user-lang');
+    if (storedLang === 'ja' || storedLang === 'en') {
+      return storedLang;
+    }
+    const browserLang = navigator.language.toLowerCase();
+    if (browserLang.startsWith('ja')) {
+      return 'ja';
+    }
+  } catch (e) {
+    console.error("Failed to access language settings:", e);
+  }
+  return 'en'; // Default to English
+};
+
 // This hook now also manages language state to correctly construct TraitRows
 export function useMatrix(): UseMatrixReturn {
-  const [lang, setLang] = useState<"ja" | "en">("ja");
+  const [lang, setLang] = useState<"ja" | "en">(getInitialLang);
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
   
@@ -83,6 +99,14 @@ export function useMatrix(): UseMatrixReturn {
   const { selected, selectedMulti } = currentState;
 
   const currentHistoryLogs = history.slice(0, historyIndex + 1).map((h) => h.log).filter((log) => log.traitName !== "Initial State");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('user-lang', lang);
+    } catch (e) {
+      console.error("Failed to save language setting:", e);
+    }
+  }, [lang]);
 
   const setMode = useCallback((newMode: "strict" | "lenient") => {
     setOpts((prev) => ({ ...prev, conflictPenalty: newMode === "strict" ? 1.0 : 0.0 }));

@@ -46,6 +46,7 @@ export default function ReportDialog({ open, onClose, currentLang, ...props }: P
                 options: props.opts,
                 history: props.history,
                 finalScores: props.scores,
+                matrixInfo: props.matrixInfo,
             });
             await GenerateIdentificationReport(reportRequest, path);
             onClose(); // Close dialog on success
