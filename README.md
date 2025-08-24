@@ -1,181 +1,178 @@
 # MyKeyLogue
 
-A cross-platform desktop application for interactive multi-access taxonomic keys using statistical algorithms.
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![ソフトの説明](readme_images/sample.png)
+**EN:** A cross-platform desktop application for interactive multi-access taxonomic keys powered by statistical algorithms.  
+**JP:** 統計アルゴリズムを用いた**対話型マルチアクセス検索表**のためのクロスプラットフォーム・デスクトップアプリです。
 
-（ここにアプリケーションのスクリーンショットを挿入）
+<img alt="MyKeyLogue UI" src="readme_images/sample.png" width="720">
 
-## Overview
+---
 
-MyKeyLogue は、Excel で作成したマトリクス形式のデータから、対話的な多分岐検索キー（multi-access key）を自動生成し、利用するためのデスクトップアプリケーションです。ベイジアン推定などの統計アルゴリズムを用いることで、不確実な情報下でもっとも確からしい候補を提示し、生物種の同定作業をサポートします。
+## Overview / 概要
 
-## Key Features
+**EN:** MyKeyLogue generates and runs **multi-access keys** directly from an **Excel-based trait matrix**, enabling you to input observable characters in any order and dynamically filter candidates. Bayesian-style scoring helps under uncertainty by highlighting the most plausible taxa.  
+**JP:** **Excel の形質マトリクス**から**マルチアクセスキー**を自動生成・実行します。観察可能な形質を**順不同**で入力して候補を動的に絞り込み、**ベイズ的な確率評価**により不確実性下でも最も有力な候補を提示します。
 
-- **クロスプラットフォーム**: Windows, macOS, Linux で動作します。
-- **マトリクスベース**: 使い慣れた Excel で形質マトリクスを簡単に作成・編集できます。
-- **統計的同定エンジン**: 形質を選択するごとに、ベイズ確率に基づいてリアルタイムに候補を再計算します。
-- **対話的な UI**: 候補リスト、形質リスト、タクソンの詳細情報、選択履歴などを直感的に操作できます。
-- **多言語対応**: UI は日本語と英語に対応しています。
+---
 
-## Installation
+## Key Features / 主要機能
 
-1.  Go (1.18 以上) と Node.js (16 以上) をインストールします。
-2.  Wails CLI をインストールします: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
-3.  このリポジトリをクローンします: `git clone https://github.com/your-username/MyKeyLogue.git`
-4.  プロジェクトディレクトリに移動します: `cd MyKeyLogue`
-5.  フロントエンドの依存関係をインストールします: `cd frontend && npm install`
-6.  アプリケーションをビルドします: `wails build`
+- **Cross-platform**  
+  **EN:** Runs on Windows / macOS / Linux.  
+  **JP:** Windows / macOS / Linux で動作。
 
-## Usage
+- **Matrix-first workflow**  
+  **EN:** Author and edit keys in familiar Excel; the app reads matrices directly.  
+  **JP:** なじみのある **Excel** で検索表を作成・編集し、そのまま読み込み。
 
-1.  `build/bin/`ディレクトリにある実行ファイルを起動します。
-2.  画面上部のドロップダウンメニューから、使用したいマトリクスを選択します。
-3.  右下のパネルから形質を選択していくと、右上の候補リストが更新されます。
-4.  候補リストのタクソン名をクリックすると、左下のパネルに詳細情報が表示されます。
+- **Statistical identification engine**  
+  **EN:** Recomputes candidate probabilities after each trait selection; adjustable tolerance for missing or ambiguous data.  
+  **JP:** 形質選択ごとに候補の**確率**を再計算。欠損や曖昧さへの許容度を調整可能。
 
-## Contributing
+- **Interactive UI**  
+  **EN:** Candidate list, trait list with help text & images, detail panes, selection history, “Why?” explanations, and **Compare** view.  
+  **JP:** 候補リスト、形質一覧（ヘルプ/画像）、詳細パネル、選択履歴、**Why?** の根拠表示、**比較**機能。
 
-バグ報告や機能提案は、GitHub の Issues で受け付けています。プルリクエストも歓迎します。
+- **Multilingual UI**  
+  **EN:** English and Japanese supported.  
+  **JP:** **英語 / 日本語**に対応。
 
-## License
+---
 
-このプロジェクトは MIT ライセンスの下で公開されています。詳細は`LICENSE`
+## Quick Start / クイックスタート
 
-## Overview
+1. **Prepare your dataset / データセットの用意**  
+   **EN:** On first launch, the app creates sibling folders:  
+   `keys/` (matrices), `help_materials/` (help images), `my_identification_reports/` (reports). Use sample Excel files in `keys/` as templates.  
+   **JP:** 初回起動時に `keys/`（マトリクス）, `help_materials/`（補助画像）, `my_identification_reports/`（レポート）を自動生成。`keys/` 内のサンプル Excel を雛形に編集。
 
-`GraphCalc` is a Python library for computing a broad range of graph-theoretic invariants, purpose-built to support research in combinatorics, network science, and automated reasoning. It offers exact implementations of over 100 functions, spanning classical invariants (e.g., independence number, chromatic number, spectral radius) and a wide array of lesser-known parameters central to contemporary graph theory.
+2. **Identify / 検索手順**  
+   **EN:** Select observable traits (any order). The candidate list updates live with a **recommendation score** that reflects statistical utility, difficulty, and risk.  
+   **JP:** 観察できる形質を**順不同**で選択。統計的有効度・**難易度**・**リスク**を考慮した推奨スコアで効率的に絞り込み。
 
-Originally developed as the invariant engine for the automated conjecturing system TxGraffiti, `GraphCalc` has since matured into a general-purpose research tool that facilitates the large-scale construction of structured, high-resolution invariant datasets. These datasets, often organized into tabular “knowledge tables,” form the basis for symbolic pattern mining, hypothesis generation, and downstream machine reasoning. For example,
+3. **Interpret results / 結果の解釈**  
+   **EN:** Click a candidate taxon for details; use **Why?** to see matches/conflicts; **Compare** multiple taxa to highlight diagnostic differences.  
+   **JP:** 候補名から詳細へ。**Why?** で一致/矛盾の根拠を確認し、**比較**で識別点を把握。  
+   **Note / 注意:** Scores are **relative to the loaded matrix**; the true specimen might be outside the key.
 
-```python
->>> import graphcalc as gc
->>> from graphcalc.polytopes.generators import cube_graph, octahedron_graph
->>> graphs = [cube_graph(), octahedron_graph()]
->>> functions = ["order", "size", "spectral_radius", "independence_number"]
->>> gc.compute_knowledge_table(functions, graphs)
-   order  size  spectral_radius  independence_number
-0      8    12              3.0                    4
-1      6    12              4.0                    2
-```
+---
 
-## Features
+## Data Format (Excel) / データ形式（Excel）
 
-- **Maximum Clique**: Finds the maximum clique in a given graph.
-- **Chromatic Number**: Computes the minimum number of colors required for graph coloring.
-- **Vertex and Edge Cover**: Determines vertex and edge covers.
-- **Matching and Independence**: Calculates maximum matching and independent sets.
-- **Domination Number and its Variants**: Calculates the domination number, total domination number, and many other domination variants.
-- **Degree Sequence Invariants**: Calculates the residue, annihilaiton number, the slater number and more!
-- **Zero Forcing**: Calculates the zero forcing number, the total zero forcing number, the positive semidefinite zero forcing number, and the power domination number.
+**EN:** Use Excel `.xlsx` with **three sheets**:  
+**JP:** Excel（`.xlsx`）で**3 つのシート**に分割して管理します。
 
-## Installation
+| Sheet Name   | Role (EN)                                                           | 役割（JP）                                                 |
+| ------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `MatrixInfo` | Metadata for the entire key (title, authors, citation, etc.)        | マトリクス全体のメタデータ（タイトル、作者、引用情報など） |
+| `TaxaInfo`   | List of taxa and details (scientific/vernacular names, description) | 分類群（Taxon）の一覧と詳細情報（学名・和名・解説など）    |
+| `Traits`     | Characters used for identification and their states per taxon       | 同定に使用する形質と、各分類群の形質状態                   |
 
-To install `graphcalc`, make sure you have Python 3.7 or higher, then install it:
+### `Traits` Sheet Headers / `Traits` シートの主なヘッダー
+
+| Header                        | Required | 説明（EN / JP）                                                                                                                                                                                                            |
+| ----------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#TraitID`                    | Optional | **EN:** Unique ID (auto-generated from `#Trait_en` if omitted); used for dependencies. **JP:** 形質の一意 ID。省略時は `#Trait_en` から自動生成。依存関係で参照。                                                          |
+| `#Dependency`                 | Optional | **EN:** `parent_trait_id=state_name`; only show when the parent has the specified state. **JP:** `親TraitID=状態名` 形式。条件成立時のみ UI に表示。                                                                       |
+| `#Group_en / #Group_ja`       | Required | **EN:** Grouping label (e.g., Head, Wings). **JP:** 形質グループ名（例：頭部、翅）。                                                                                                                                       |
+| `#Trait_en / #Trait_ja`       | Required | **EN:** Character name shown in the UI. **JP:** UI に表示される形質名。                                                                                                                                                    |
+| `#Type`                       | Required | **EN:** Character type (see below). **JP:** 形質の型（後述）。                                                                                                                                                             |
+| `#HelpText_en / #HelpText_ja` | Optional | **EN:** Definition and how-to-observe; displayed in help panel. **JP:** 定義・観察方法などの補助説明（ヘルプに表示）。                                                                                                     |
+| `#HelpImages`                 | Optional | **EN:** Comma-separated image filenames in `help_materials/`. **JP:** `help_materials/` に置く画像ファイル名（カンマ区切り）。                                                                                             |
+| `#Difficulty`                 | Optional | **EN:** Observation difficulty; affects recommendation. Accepted: `Easy`, `Normal`, `Hard`, `Very Hard`, or a positive number. **JP:** 観察難易度。推奨度に影響。`Easy` / `Normal` / `Hard` / `Very Hard` または正の数値。 |
+| `#Risk`                       | Optional | **EN:** Misinterpretation risk; affects recommendation. Accepted: `Lowest`, `Low`, `Medium`, `High`, `Highest`, or a number between 0 and 1. **JP:** 誤判定リスク。推奨度に影響。`Lowest`〜`Highest` または 0〜1 の数値。  |
+
+#### Character Types / 形質タイプの指針
+
+- **EN:**
+  - `binary`: presence/absence (e.g., `1`, `y`, `present` = Yes; `-1`, `n`, `absent` = No)
+  - `nominal_parent`: multiple **exclusive** states (e.g., body color)
+  - `continuous`: numeric values
+  - `categorical_multi`: multiple **simultaneous** states (e.g., distribution)
+- **JP:**
+  - `binary`: **有無/はい・いいえ**（`1`,`y`,`present` = Yes / `-1`,`n`,`absent` = No）
+  - `nominal_parent`: 相互排他的な**複数状態**（例：体色）
+  - `continuous`: **数値**
+  - `categorical_multi`: **複数状態が同時**に成り立つ（例：分布域）
+
+**Best Practices / コツ**  
+**EN:** Prefer objective traits (e.g., “Punctate: yes/no”) and move nuance into help text, instead of vague scales like “weakly punctate.”  
+**JP:** 「弱く点刻」などの主観的表現は避け、「点刻の有無」のように客観化し、細部はヘルプで補足。
+
+---
+
+## Installation / インストール
+
+**Prereqs / 前提条件**
+
+- Go **1.18+**
+- Node.js **16+**
+- Wails CLI
 
 ```bash
-pip install graphcalc
+# Install Wails
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+# Clone and enter
+git clone https://github.com/soshimizu/identification-key.git
+cd identification-key
+
+# Install frontend deps
+cd frontend && npm install && cd ..
+
+# Build the app
+wails build
 ```
 
-## Linear and Integer Programming Solvers
+**EN:** Artifacts will be in `build/bin/`.
+**JP:** 生成物は `build/bin/` に出力されます。
 
-Many of the NP-hard graph invariant computations of GraphCalc depend on third-party solvers.At least one of the following is required if you intend to use solver-based functions (e.g., `gc.maximum_independent_set(G)`):
+---
 
-- **CBC** (recommended):
+## Usage / 使い方
 
-```bash
-brew install cbc      # macOS
-sudo apt install coinor-cbc  # Debian/Ubuntu
-```
+1. **Launch / 起動**: run the executable in `build/bin/`.
+2. **Load matrix / マトリクス選択**: choose a matrix from the top dropdown.
+3. **Select traits / 形質選択**: pick any observable traits; candidates update live.
+4. **Inspect / 詳細**: click a candidate for details; use **Why?** to view supporting/conflicting traits; **Compare** for side-by-side differences.
+5. **Reports / レポート**: outputs are saved under `my_identification_reports/`.
 
-GraphCalc will attempt to automatically detect the solver if it is installed. You can also manually specify the solver in API calls.
+---
 
-## Example Graph Usage
+## Contributing / 開発・貢献
 
-```python
-from graphcalc import (
-    independence_number,
-    domination_number,
-    zero_forcing_number,
-)
-from graphcalc.generators import petersen_graph
+**EN:** Issues and PRs are welcome. Please discuss large changes in an issue first.
+**JP:** 不具合報告・機能要望・PR 歓迎。大きな変更は事前に Issue で議論してください。
 
-# Calculate and print the independence number of the Petersen graph.
-G = petersen_graph()
-print(f"Petersen graph independence number = {independence_number(G)}")
+- GitHub: [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
+- Issues: [https://github.com/soshimizu/identification-key/issues](https://github.com/soshimizu/identification-key/issues)
 
-# Calculate and print the domination number of the Petersen graph.
-print(f"Petersen graph domination number = {domination_number(G)}")
+---
 
-# Calculate and print the zero forcing number of the Petersen graph.
-print(f"Petersen graph zero forcing number = {zero_forcing_number(G)}")
-```
+## Citation / 引用
 
-## Example Polytope Usage
+**EN (software):**
+Shimizu S. (2025) _MyKeyLogue: A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification._ [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
 
-```python
-import graphcalc as gc
-from graphcalc.polytopes.generators import (
-    cube_graph,
-    octahedron_graph,
-    dodecahedron_graph,
-    tetrahedron_graph,
-    icosahedron_graph,
-    convex_polytopes_text_example,
-)
+**JP（ソフトウェア引用）:**
+Shimizu S. (2025) _MyKeyLogue: 分類学的同定のためのインタラクティブ・マルチアクセスキー・プラットフォーム._ [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
 
-# Generate polytope graphs (cubes, octahedra, etc.)
-G1 = cube_graph()
-G2 = octahedron_graph()
-G3 = dodecahedron_graph()
-G4 = tetrahedron_graph()
-G5 = icosahedron_graph()
-G6 = convex_polytopes_text_example(1)
-G7 = convex_polytopes_text_example(2)
+**Matrices / マトリクスの引用:**
+**EN:** When publishing results built with a given matrix, cite the matrix as specified by its author **in addition** to citing this software.
+**JP:** 本ソフトで作成・利用したマトリクスを研究等で用いる場合は、**ソフトの引用に加え**、各マトリクス作者が指定する引用情報にも従ってください。
 
+---
 
-# Function names to compute
-function_names = [
-    "order", # number of vertices
-    "size", # number of edges
-    "p_vector",
-    "independence_number",
-    "vertex_cover_number",
-    "maximum_degree",
-    "average_degree",
-    "minimum_degree",
-    "spectral_radius",
-    "diameter",
-    "radius",
-    "girth",
-    "algebraic_connectivity",
-    "largest_laplacian_eigenvalue",
-    "second_largest_adjacency_eigenvalue",
-    "smallest_adjacency_eigenvalue",
-    "fullerene",
-    ]
+## License / ライセンス
 
-# Compute properties for multiple polytopes
-graphs = [G1, G2, G3, G4, G5, G6, G7]
-df = gc.compute_knowledge_table(function_names, graphs)
-```
+**EN:** Released under the **MIT License**. See [`LICENSE`](LICENSE).
+**JP:** 本プロジェクトは **MIT ライセンス** です。詳細は [`LICENSE`](LICENSE) を参照。
 
-## Creating Simple Graphs, Polytope Graphs, and Simple Polytope Graphs
+---
 
-```python
-import graphcalc as gc
-
-# Draw a simple graph
-G = gc.SimpleGraph(name="Example Graph")
-G.add_edges_from([(0, 1), (1, 2), (2, 3)])
-G.draw()
-```
-
-### Author
+## Author / 著者
 
 So Shimizu, PhD
-Web 1: <https://soshimizu.com/>
-Web 2: <https://ichneumonoidea-world.com/>
-Email: <parasitoidwasp.sou@gmail.com>
+Web: [https://soshimizu.com/](https://soshimizu.com/) / [https://ichneumonoidea-world.com/](https://ichneumonoidea-world.com/)
+Email: [parasitoidwasp.sou@gmail.com](mailto:parasitoidwasp.sou@gmail.com)
