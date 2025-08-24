@@ -85,7 +85,7 @@ export default function CandidatesPanel({
       setJustificationOpen(true);
       setCurrentTargetTaxon(taxon);
       try {
-          const result = await GetJustificationForTaxon(taxon.id, selected, selectedMulti, lang);
+          const result = await GetJustificationForTaxon(taxon.id, selected, selectedMulti);
           setCurrentJustification(result as Justification);
       } catch (error) {
           console.error("Failed to get justification:", error);
