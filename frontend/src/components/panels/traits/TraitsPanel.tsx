@@ -1,4 +1,3 @@
-// frontend/src/components/panels/traits/TraitsPanel.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Paper, Box, Typography, Stack, Button, ButtonGroup, Chip, Table, TableHead,
@@ -11,7 +10,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { STR } from "../../../i18n";
 import { Trait, TraitSuggestion, MultiChoice, Choice } from "../../../api";
-
+import { useMatrix } from "../../../hooks/useMatrix";
 
 export type TraitRow =
   | { group: string; traitName: string; type: "binary"; binary: Trait }
@@ -36,7 +35,10 @@ type Props = {
   lang?: "ja" | "en";
 };
 
-// getRowSuggestion, ScoreBar, ContinuousInput, MultiChoiceInlineInput remain unchanged...
+// =============================================================================
+// Helper Components (Unchanged)
+// =============================================================================
+
 function getRowSuggestion(row: TraitRow, suggMap: Record<string, TraitSuggestion>): TraitSuggestion | undefined {
     if (row.type === "binary") return suggMap[row.binary.id];
     if (row.type === "continuous") return suggMap[row.continuous.id];
@@ -51,7 +53,6 @@ const ScoreBar = React.memo(({ suggestion }: { suggestion?: TraitSuggestion }) =
     const normalizedScore = Math.max(0, baseScore / ig);
     const w = Math.max(2, Math.min(100, Math.round(normalizedScore * 100)));
     const tooltipTitle = `Score: ${suggestion.score.toFixed(3)} (IG: ${suggestion.ig?.toFixed(3) ?? 'N/A'} / MaxIG: ${suggestion.max_ig?.toFixed(3) ?? 'N/A'})`;
-
 
     return (
       <Tooltip title={tooltipTitle}>
@@ -142,7 +143,7 @@ const MultiChoiceInlineInput = ({ trait, selectedValues, isNA, onApply, onSetNA,
                 <Button size="small" variant={isNA ? 'contained' : 'outlined'} onClick={onSetNA}>{T.state_na}</Button>
             </Tooltip>
             <Tooltip title={T.tooltip_clear}>
-                 <span>
+                  <span>
                     <IconButton size="small" onClick={onClear} disabled={selectedValues.length === 0 && !isNA}>
                         <ClearIcon />
                     </IconButton>
@@ -151,7 +152,6 @@ const MultiChoiceInlineInput = ({ trait, selectedValues, isNA, onApply, onSetNA,
         </Stack>
     );
 };
-
 
 const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setContinuous, setMulti, setMultiAsNA, setDerivedPick, clearDerived, rank, suggestion, onTraitSelect, lang = "ja" }: {
   r: TraitRow;
@@ -175,7 +175,6 @@ const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setCont
   const helpText = lang === 'ja' ? traitObject.helpText_jp : traitObject.helpText_en;
   const hasHelpText = helpText && helpText.trim() !== "";
   const hasHelpImages = traitObject.helpImages && traitObject.helpImages.length > 0 && traitObject.helpImages[0] !== "";
-
 
   return (
     <TableRow hover onClick={() => onTraitSelect(traitObject)} sx={{ cursor: 'pointer' }}>
@@ -216,20 +215,72 @@ const RowRenderer = React.memo(({ r, selected, selectedMulti, setBinary, setCont
   );
 });
 
+// =============================================================================
+// Main Component
+// =============================================================================
+
 export default function TraitsPanel(props: Props) {
   const { mode, rows, selected, selectedMulti, sortBy, suggMap } = props;
+  const { traits: allTraits } = useMatrix();
+
+  const isTraitVisible = (trait: Trait): boolean => {
+    if (!trait.parentDependency || !allTraits) {
+      return true;
+    }
+
+    const parentId = trait.parentDependency.parentTraitId;
+    const requiredState = trait.parentDependency.requiredState.toLowerCase();
+    
+    const parentTrait = allTraits.find((t: Trait) => t.traitId === parentId);
+    if (!parentTrait) {
+        return false;
+    }
+
+    if (parentTrait.type === 'nominal_parent' || parentTrait.type === 'binary') {
+        const childTraits = allTraits.filter((t: Trait) => t.parent === parentTrait.traitId);
+        
+        for (const child of childTraits) {
+            if (selected[child.id] === 1) {
+                return child.state?.toLowerCase() === requiredState;
+            }
+        }
+    }
+
+    if (parentTrait.type === 'categorical_multi') {
+        const selectedStates = selectedMulti[parentTrait.id];
+        if (selectedStates && selectedStates.length > 0) {
+            return selectedStates.some(s => s.toLowerCase() === requiredState);
+        }
+    }
+    
+    return false;
+  };
 
   const filteredAndSortedRows = useMemo(() => {
-    const filtered = rows.filter(r => {
-        if (r.type === 'binary') return mode === 'selected' ? selected[r.binary.id] !== undefined : selected[r.binary.id] === undefined;
-        if (r.type === 'continuous') return mode === 'selected' ? selected[r.continuous.id] !== undefined : selected[r.continuous.id] === undefined;
-        if (r.type === 'categorical_multi') {
-            const isSelectedWithValues = props.selectedMulti[r.multi.id] !== undefined;
-            const isSelectedAsNA = selected[r.multi.id] === 0;
-            return mode === 'selected' ? isSelectedWithValues || isSelectedAsNA : !isSelectedWithValues && !isSelectedAsNA;
+    const getTraitFromRow = (r: TraitRow): Trait => {
+        switch(r.type) {
+            case 'binary': return r.binary;
+            case 'continuous': return r.continuous;
+            case 'categorical_multi': return r.multi;
+            case 'derived': return r.parentTrait;
         }
-        const isSelected = r.children.some(c => selected[c.id] !== undefined);
-        return mode === 'selected' ? isSelected : !isSelected;
+    }
+
+    const filtered = rows.filter(r => {
+      const trait = getTraitFromRow(r);
+      if (!isTraitVisible(trait)) {
+          return false;
+      }
+      
+      if (r.type === 'binary') return mode === 'selected' ? selected[r.binary.id] !== undefined : selected[r.binary.id] === undefined;
+      if (r.type === 'continuous') return mode === 'selected' ? selected[r.continuous.id] !== undefined : selected[r.continuous.id] === undefined;
+      if (r.type === 'categorical_multi') {
+          const isSelectedWithValues = props.selectedMulti[r.multi.id] !== undefined && props.selectedMulti[r.multi.id].length > 0;
+          const isSelectedAsNA = selected[r.multi.id] === 0;
+          return mode === 'selected' ? isSelectedWithValues || isSelectedAsNA : !isSelectedWithValues && !isSelectedAsNA;
+      }
+      const isSelected = r.children.some(c => selected[c.id] !== undefined);
+      return mode === 'selected' ? isSelected : !isSelected;
     });
 
     return filtered.sort((a, b) => {
@@ -246,7 +297,7 @@ export default function TraitsPanel(props: Props) {
         }
         return a.traitName.localeCompare(b.traitName);
       });
-  }, [rows, mode, selected, selectedMulti, sortBy, suggMap, props.selectedMulti]);
+  }, [rows, mode, selected, selectedMulti, sortBy, suggMap, allTraits]); 
 
   const localSuggRank = useMemo(() => {
     if (sortBy !== 'recommend') return {};

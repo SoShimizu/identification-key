@@ -295,8 +295,8 @@ export default function RibbonWelcomeTab({ lang }: Props) {
       </Typography>
       <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
         {ja
-          ? "分類学的同定のための知的・インタラクティブ・マルチアクセスキー"
-          : "An Intelligent, Interactive Multi-Access Key for Taxonomic Identification"}
+          ? "分類学的同定におけるインタラクティブなマルチアクセスキーのためのソフトウェアプラットフォーム"
+          : "A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification"}
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         {ja
@@ -523,8 +523,8 @@ export default function RibbonWelcomeTab({ lang }: Props) {
                 <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
                   <strong>Shimizu S. 2025.</strong>{" "}
                   {ja
-                    ? "MyKeyLogue: 分類学的同定のための知的・インタラクティブ・マルチアクセスキー。"
-                    : "MyKeyLogue: An Intelligent, Interactive Multi-Access Key for Taxonomic Identification."}
+                    ? "MyKeyLogue: 分類学的同定におけるインタラクティブなマルチアクセスキーのためのソフトウェアプラットフォーム."
+                    : "MyKeyLogue: A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification."}
                   <Link
                     href="https://github.com/soshimizu/identification-key"
                     target="_blank"

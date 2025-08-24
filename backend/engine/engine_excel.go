@@ -39,6 +39,8 @@ func parseParentDependency(s string) *Dependency {
 	if requiredState == "" {
 		requiredState = matches[3]
 	}
+	// Note: ParentTraitID here is the user-provided ID or name, not the final canonical ID.
+	// It will be resolved later using the ID resolver map.
 	return &Dependency{ParentTraitID: matches[1], RequiredState: requiredState}
 }
 
@@ -378,44 +380,92 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 		return errors.New("no matching taxonIDs found between Traits header and TaxaInfo sheet")
 	}
 
-	// --- 1st Pass: Build lookup maps for dependency resolution ---
-	nameEnToTraitId := make(map[string]string)
+	// --- Pass 1: Build TraitID resolver map ---
+	traitIDResolver := make(map[string]string)
+	usedCanonicalIDs := make(map[string]bool)
+
 	for r := 1; r < len(rows); r++ {
 		traitNameEN := cleanString(getCell(rows, r, headerMap["#trait_en"]))
 		if traitNameEN == "" {
 			continue
 		}
-		traitID := cleanString(getCell(rows, r, headerMap["#traitid"]))
-		if traitID == "" {
-			traitID = sanitizeToID(traitNameEN)
+
+		// --- Start of Modified Logic for Unique ID Generation ---
+		var canonicalTraitID string
+		userDefinedID := cleanString(getCell(rows, r, headerMap["#traitid"]))
+
+		if userDefinedID != "" {
+			canonicalTraitID = userDefinedID
+		} else {
+			sanitizedNameID := sanitizeToID(traitNameEN)
+			if _, exists := usedCanonicalIDs[sanitizedNameID]; exists {
+				// ID collision detected, prepend group name to make it unique.
+				groupName := cleanString(getCell(rows, r, headerMap["#group_en"]))
+				sanitizedGroupName := sanitizeToID(groupName)
+				canonicalTraitID = fmt.Sprintf("%s_%s", sanitizedGroupName, sanitizedNameID)
+				log.Printf("[EXCEL PARSER] Duplicate sanitized name '%s' found. Generated unique ID with group: '%s'", sanitizedNameID, canonicalTraitID)
+			} else {
+				canonicalTraitID = sanitizedNameID
+			}
 		}
-		nameEnToTraitId[traitNameEN] = traitID
-		nameEnToTraitId[sanitizeToID(traitNameEN)] = traitID
+		usedCanonicalIDs[canonicalTraitID] = true
+		// --- End of Modified Logic ---
+
+		// Map the original sanitized name to the (potentially new) canonical ID for dependency resolution.
+		sanitizedNameID := sanitizeToID(traitNameEN)
+		traitIDResolver[sanitizedNameID] = canonicalTraitID
+
+		if userDefinedID != "" {
+			traitIDResolver[userDefinedID] = canonicalTraitID
+		}
 	}
+	log.Printf("[EXCEL PARSER] Pass 1 complete. Built TraitID resolver map with %d entries.", len(traitIDResolver))
 
-	// --- 2nd Pass: Process traits and resolve dependencies ---
+	// --- Pass 2: Process traits and resolve dependencies ---
 	for r := 1; r < len(rows); r++ {
 		traitNameEN := cleanString(getCell(rows, r, headerMap["#trait_en"]))
 		if traitNameEN == "" {
 			continue
 		}
 
-		traitID := cleanString(getCell(rows, r, headerMap["#traitid"]))
-		if traitID == "" {
-			traitID = sanitizeToID(traitNameEN)
+		// --- Start of Modified Logic for Unique ID Re-generation ---
+		var canonicalTraitID string
+		userDefinedID := cleanString(getCell(rows, r, headerMap["#traitid"]))
+
+		if userDefinedID != "" {
+			canonicalTraitID = userDefinedID
+		} else {
+			sanitizedNameID := sanitizeToID(traitNameEN)
+			// This logic MUST be identical to Pass 1 to ensure we get the same ID.
+			// We look up the final ID from the resolver map instead of re-calculating everything.
+			// This is safer.
+			resolvedID, ok := traitIDResolver[sanitizedNameID]
+			if !ok {
+				log.Printf("[EXCEL PARSER] FATAL: Could not find resolved ID for trait '%s' in Pass 2. This should not happen.", traitNameEN)
+				continue
+			}
+			canonicalTraitID = resolvedID
 		}
+		// --- End of Modified Logic ---
 
 		var dependency *Dependency
 		depStr := cleanString(getCell(rows, r, headerMap["#dependency"]))
 		if depStr != "" {
 			dep := parseParentDependency(depStr)
 			if dep != nil {
-				if resolvedId, ok := nameEnToTraitId[dep.ParentTraitID]; ok {
-					dep.ParentTraitID = resolvedId
-				} else if resolvedId, ok := nameEnToTraitId[sanitizeToID(dep.ParentTraitID)]; ok {
-					dep.ParentTraitID = resolvedId
+				parentIdentifier := dep.ParentTraitID
+				resolvedParentID, ok := traitIDResolver[parentIdentifier]
+				if !ok {
+					// Fallback for cases where dependency is specified by name, not ID
+					resolvedParentID, ok = traitIDResolver[sanitizeToID(parentIdentifier)]
 				}
-				dependency = dep
+
+				if ok {
+					dep.ParentTraitID = resolvedParentID
+					dependency = dep
+				} else {
+					log.Printf("[EXCEL PARSER] Warning: Could not resolve dependency parent '%s' for trait '%s'. Dependency will be ignored.", parentIdentifier, traitNameEN)
+				}
 			}
 		}
 
@@ -423,7 +473,7 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 
 		trait := Trait{
 			ID:               fmt.Sprintf("t%04d", len(matrix.Traits)+1),
-			TraitID:          traitID,
+			TraitID:          canonicalTraitID,
 			NameEN:           traitNameEN,
 			NameJP:           cleanString(getCell(rows, r, headerMap["#trait_ja"])),
 			GroupEN:          cleanString(getCell(rows, r, headerMap["#group_en"])),
@@ -564,6 +614,7 @@ func parseTraits(f *excelize.File, matrix *Matrix, taxaMap map[string]*Taxon) er
 			matrix.Traits = append(matrix.Traits, trait)
 		}
 	}
+	log.Printf("[EXCEL PARSER] Pass 2 complete. All traits processed.")
 
 	return nil
 }

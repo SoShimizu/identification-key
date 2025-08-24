@@ -70,7 +70,7 @@ func getReportStrings(lang string) reportStrings {
 			ConfidenceContested:  "要検討 (上位候補が競合しており、単一のタクソンを断定するには情報が不十分です。追加の形質観察を推奨します)",
 			ConfidenceNA:         "N/A (候補なし)",
 			CitationTitle:        "引用",
-			CitationText:         "このレポートを研究等で利用する場合は、MyKeyLogueを引用してください:\n  Shimizu S. 2025. MyKeyLogue: An Intelligent, Interactive Multi-Access Key for Taxonomic Identification. https://github.com/soshimizu/identification-key",
+			CitationText:         "このレポートを研究等で利用する場合は、MyKeyLogueを引用してください:\n  Shimizu S. 2025. MyKeyLogue: A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification. https://github.com/soshimizu/identification-key",
 			EndOfReport:          "レポート終端",
 			ReportFilenamePrefix: "MyKeyLogueレポート",
 		}
@@ -106,7 +106,7 @@ func getReportStrings(lang string) reportStrings {
 		ConfidenceContested:  "Contested (Top candidates are too close to make a definitive identification. Additional character observation is recommended)",
 		ConfidenceNA:         "N/A (No candidates)",
 		CitationTitle:        "Citation",
-		CitationText:         "If you use this report in your work, please cite MyKeyLogue:\n  Shimizu S. 2025. MyKeyLogue: An Intelligent, Interactive Multi-Access Key for Taxonomic Identification. https://github.com/soshimizu/identification-key",
+		CitationText:         "If you use this report in your work, please cite MyKeyLogue:\n  Shimizu S. 2025. MyKeyLogue: A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification. https://github.com/soshimizu/identification-key",
 		EndOfReport:          "End of Report",
 		ReportFilenamePrefix: "MyKeyLogue_Report",
 	}
