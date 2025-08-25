@@ -46,6 +46,14 @@ export default function App() {
   const [isMatrixLoading, setIsMatrixLoading] = useState(false);
   const [isInfoEditorOpen, setIsInfoEditorOpen] = useState(false);
   
+  useEffect(() => {
+    console.log("[App.tsx] matrixState has been updated.", { 
+      historyLength: matrixState.history.length, 
+      scoresLength: matrixState.scores.length,
+      activeKey: matrixState.activeKey
+    });
+  }, [matrixState]);
+
   const fetchKeysDirectory = useCallback(async () => {
     try {
         const path = await api.GetKeysDirectory();
@@ -279,7 +287,7 @@ export default function App() {
             </Box>
             <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
                 <Box sx={{ height: '100%', display: keySubTab === 'key' ? 'block' : 'none' }}>
-                    <KeyTabPanel />
+                    <KeyTabPanel matrixState={matrixState} /> 
                 </Box>
                 <Box sx={{ height: '100%', display: keySubTab === 'settings' ? 'block' : 'none', overflowY: 'auto' }}>
                     <Box sx={{p: 2}}>
@@ -300,7 +308,7 @@ export default function App() {
             />
           </Box>
           <Box sx={{ height: "100%", display: mainTab === "report" ? "block" : "none" }}>
-            <ReportTabPanel />
+            <ReportTabPanel matrixState={matrixState} />
           </Box>
         </Box>
         

@@ -1,91 +1,103 @@
 // frontend/src/components/tabs/report/ReportTabPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Typography, Paper, Stack } from '@mui/material';
+import { Box, Button, Typography, Paper, Stack, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { useMatrix } from '../../../hooks/useMatrix';
-import { GenerateIdentificationReport, SaveReportDialog } from '../../../../wailsjs/go/main/App';
-import { main } from '../../../../wailsjs/go/models';
+import { SaveReport } from '../../../../wailsjs/go/main/App';
 import { STR } from '../../../i18n';
-import { MatrixInfo, TaxonScore } from '../../../api';
+import { TaxonScore, Taxon } from '../../../api';
+import { UseMatrixReturn } from '../../../hooks/useMatrix';
+import { RichTextEditor } from '../../common/RichTextEditor'; // ★ RichTextEditorをインポート
 
-const generateReportText = (matrixState: any, lang: 'ja' | 'en'): string => {
+// 学名をフォーマットするヘルパー関数
+const formatTaxonNameForReport = (taxon: Taxon): string => {
+    if (taxon.genus && taxon.species) {
+        let name = `<i>${taxon.genus} ${taxon.species}</i>`;
+        if (taxon.subspecies) {
+            name += ` <i>${taxon.subspecies}</i>`;
+        }
+        return name;
+    }
+    return taxon.name || taxon.id;
+};
+
+// レポートをHTMLとして生成する関数
+const generateReportHtml = (matrixState: UseMatrixReturn, lang: 'ja' | 'en'): string => {
     const s = STR[lang].report;
     const { matrixName, algo, opts, history, scores, matrixInfo } = matrixState;
 
     if (!matrixInfo) {
-        return lang === 'ja' ? "マトリクスが読み込まれていません。" : "No matrix is loaded.";
+        return lang === 'ja' ? "<p>マトリクスが読み込まれていません。</p>" : "<p>No matrix is loaded.</p>";
     }
 
     let sb = '';
-    const hr = "--------------------------------------------------\n";
+    const hr = "<p>--------------------------------------------------</p>";
 
-    sb += "==================================================\n";
-    sb += `       ${s.title}\n`;
-    sb += "==================================================\n\n";
-    
+    sb += "<h1>MyKeyLogue Identification Report</h1>";
     const now = new Date();
-    sb += `${s.date}: ${now.toLocaleString(lang)}\n\n`;
+    sb += `<p><b>${s.date}:</b> ${now.toLocaleString(lang)}</p>`;
 
-    sb += hr + `${s.matrixInfoTitle}\n` + hr;
+    sb += hr + `<p><b>${s.matrixInfoTitle}</b></p>`;
     const matrixTitle = lang === 'ja' ? matrixInfo.title_jp || matrixInfo.title_en : matrixInfo.title_en || matrixInfo.title_jp;
-    sb += `  - ${s.matrixFile}: ${matrixName}\n`;
-    sb += `  - ${s.matrixTitle}: ${matrixTitle || 'N/A'}\n`;
-    sb += `  - ${s.matrixVersion}: ${matrixInfo.version || 'N/A'}\n\n`;
+    sb += `<p>- <b>${s.matrixFile}:</b> ${matrixName}</p>`;
+    sb += `<p>- <b>${s.matrixTitle}:</b> ${matrixTitle || 'N/A'}</p>`;
+    sb += `<p>- <b>${s.matrixVersion}:</b> ${matrixInfo.version || 'N/A'}</p>`;
 
-    sb += hr + `${s.parametersUsed}\n` + hr;
-    sb += `  - ${s.algorithm}: ${algo}\n`;
+    sb += hr + `<p><b>${s.parametersUsed}</b></p>`;
+    sb += `<p>- <b>${s.algorithm}:</b> ${algo}</p>`;
     if (algo === 'bayes') {
-        sb += `  - ${s.conflictPenalty}: ${opts.conflictPenalty.toFixed(2)}\n`;
-        sb += `  - ${s.gammaNAPenalty}: ${opts.gammaNAPenalty.toFixed(2)}\n`;
-        sb += `  - ${s.kappa}: ${opts.kappa.toFixed(2)}\n`;
+        sb += `<p>- <b>${s.conflictPenalty}:</b> ${opts.conflictPenalty.toFixed(2)}</p>`;
+        sb += `<p>- <b>${s.gammaNAPenalty}:</b> ${opts.gammaNAPenalty.toFixed(2)}</p>`;
+        sb += `<p>- <b>${s.kappa}:</b> ${opts.kappa.toFixed(2)}</p>`;
     }
-    sb += `  - ${s.tolerance}: ${(opts.toleranceFactor * 100).toFixed(0)}%\n\n`;
+    sb += `<p>- <b>${s.tolerance}:</b> ${(opts.toleranceFactor * 100).toFixed(0)}%</p>`;
 
-    sb += hr + `${s.observationHistory}\n` + hr;
+    sb += hr + `<p><b>${s.observationHistory}</b></p>`;
     if (history.length === 0) {
-        sb += `  ${s.noObservations}\n`;
+        sb += `<p>${s.noObservations}</p>`;
     } else {
         history.forEach((item: any, i: number) => {
-            sb += `  ${i + 1}. ${item.traitName}: ${item.selection}\n`;
+            sb += `<p>${i + 1}. ${item.traitName}: ${item.selection}</p>`;
         });
     }
-    sb += "\n";
 
-    sb += hr + `${s.finalRanking}\n` + hr;
+    sb += hr + `<p><b>${s.finalRanking}</b></p>`;
     if (scores.length === 0) {
-        sb += `  ${s.noCandidates}\n`;
+        sb += `<p>${s.noCandidates}</p>`;
     } else {
-        const header = `${s.rankHeader.padEnd(6)} ${s.taxonHeader.padEnd(40)} ${s.scoreHeader.padEnd(15)} ${s.conflictsHeader.padEnd(12)} ${s.matchSupportHeader.padEnd(10)}\n`;
-        sb += header;
-        sb += "".padEnd(85, "-") + "\n";
+        sb += `<p>${s.rankHeader} | ${s.taxonHeader} | ${s.scoreHeader} | ${s.conflictsHeader} | ${s.matchSupportHeader}</p>`;
+        sb += "<p>" + "".padEnd(85, "-") + "</p>";
         scores.slice(0, 10).forEach((score: TaxonScore, i: number) => {
             const probStr = (score.post * 100).toFixed(2) + '%';
             const matchSupport = `${score.match}/${score.support}`;
-            const taxonName = score.taxon.name || score.taxon.id;
-            sb += `${String(i + 1).padEnd(6)} ${taxonName.padEnd(40)} ${probStr.padEnd(15)} ${String(score.conflicts).padEnd(12)} ${matchSupport.padEnd(10)}\n`;
+            const taxonNameHtml = formatTaxonNameForReport(score.taxon);
+            sb += `<p>${String(i + 1)} | ${taxonNameHtml} | ${probStr} | ${String(score.conflicts)} | ${matchSupport}</p>`;
         });
         if (scores.length > 10) {
-            sb += `  ...and ${scores.length - 10} more.\n`;
+            sb += `<p>...and ${scores.length - 10} more.</p>`;
         }
     }
-    sb += "\n";
-
+    
     return sb;
 };
 
-export const ReportTabPanel: React.FC = () => {
-    const matrixState = useMatrix();
-    const { lang, history, scores, matrixInfo, algo, opts, matrixName } = matrixState;
-    const [reportText, setReportText] = useState('');
+interface ReportTabPanelProps {
+  matrixState: UseMatrixReturn;
+}
+
+export const ReportTabPanel: React.FC<ReportTabPanelProps> = ({ matrixState }) => {
+    const { lang, history, scores } = matrixState;
+    const [reportHtml, setReportHtml] = useState('');
+    const [saveFormat, setSaveFormat] = useState<'txt' | 'docx'>('txt');
 
     useEffect(() => {
-        console.log('[ReportTabPanel] useEffect triggered. Recalculating report text.');
-        console.log(`[ReportTabPanel] Dependencies: history length=${history.length}, scores length=${scores.length}, matrixName=${matrixName}, lang=${lang}`);
-        
-        const newText = generateReportText(matrixState, lang);
-        setReportText(newText);
-    }, [matrixState, lang]); // ★ 依存配列を修正
+        if (matrixState.history.length > 0) {
+            const newHtml = generateReportHtml(matrixState, lang);
+            setReportHtml(newHtml);
+        } else {
+            setReportHtml("");
+        }
+    }, [matrixState, lang, history, scores]);
 
     const handleSave = async () => {
         const now = new Date();
@@ -94,44 +106,51 @@ export const ReportTabPanel: React.FC = () => {
         const defaultName = `MyKeyLogue_Report_${timestamp}_${topCandidateName}.txt`;
 
         try {
-            const path = await SaveReportDialog(defaultName);
-
+            const path = await SaveReport(reportHtml, saveFormat, defaultName);
             if (path) {
-                const reportRequest = new main.ReportRequest({
-                    lang: lang,
-                    matrixName: matrixName,
-                    algorithm: algo,
-                    options: opts,
-                    history: history,
-                    finalScores: scores,
-                    matrixInfo: matrixInfo as MatrixInfo,
-                });
-                await GenerateIdentificationReport(reportRequest, path);
                 alert(`Report saved to: ${path}`);
             }
         } catch (error) {
             console.error("Failed to save report:", error);
-            alert("Failed to save report.");
+            alert(`Failed to save report: ${error}`);
         }
     };
     
     const handleCopyToClipboard = async () => {
-        await navigator.clipboard.writeText(reportText);
-        alert('Report copied to clipboard!');
+        try {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = reportHtml;
+            const plainText = tempDiv.textContent || tempDiv.innerText || "";
+            await navigator.clipboard.writeText(plainText);
+            alert('Report (plain text) copied to clipboard!');
+        } catch (error) {
+            console.error("Failed to copy to clipboard:", error);
+            alert("Failed to copy to clipboard.");
+        }
     };
 
     return (
         <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, flexShrink: 0 }}>
                 <Typography variant="h5">Identification Report</Typography>
-                <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <ToggleButtonGroup
+                        value={saveFormat}
+                        exclusive
+                        size="small"
+                        onChange={(e, newFormat) => { if(newFormat) setSaveFormat(newFormat); }}
+                        aria-label="save format"
+                    >
+                        <ToggleButton value="txt">TXT</ToggleButton>
+                        <ToggleButton value="docx">WORD</ToggleButton>
+                    </ToggleButtonGroup>
                     <Button
                         variant="outlined"
                         startIcon={<ContentCopyIcon />}
                         onClick={handleCopyToClipboard}
                         disabled={history.length === 0}
                     >
-                        Copy to Clipboard
+                        Copy
                     </Button>
                     <Button
                         variant="contained"
@@ -143,8 +162,19 @@ export const ReportTabPanel: React.FC = () => {
                     </Button>
                 </Stack>
             </Stack>
-            <Paper variant="outlined" sx={{ flex: 1, p: 2, fontFamily: 'monospace', whiteSpace: 'pre', overflow: 'auto', fontSize: '0.8rem' }}>
-                {history.length > 0 ? reportText : "No identification session is active. Please select some traits in the KEY tab to generate a report."}
+            <Paper variant="outlined" sx={{ flex: 1, p: 0, display: 'flex', flexDirection: 'column' }}>
+                {history.length > 0 ? (
+                    <RichTextEditor
+                        label=""
+                        value={reportHtml}
+                        onValueChange={setReportHtml}
+                        height="100%"
+                    />
+                ) : (
+                    <Box sx={{p: 2}}>
+                        <Typography>No identification session is active. Please select some traits in the KEY tab to generate a report.</Typography>
+                    </Box>
+                )}
             </Paper>
         </Box>
     );

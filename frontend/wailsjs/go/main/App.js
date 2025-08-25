@@ -14,10 +14,6 @@ export function EnsureMyKeysAndSamples() {
   return window['go']['main']['App']['EnsureMyKeysAndSamples']();
 }
 
-export function GenerateIdentificationReport(arg1, arg2) {
-  return window['go']['main']['App']['GenerateIdentificationReport'](arg1, arg2);
-}
-
 export function GenerateUUID() {
   return window['go']['main']['App']['GenerateUUID']();
 }
@@ -70,8 +66,8 @@ export function SaveMatrix(arg1, arg2) {
   return window['go']['main']['App']['SaveMatrix'](arg1, arg2);
 }
 
-export function SaveReportDialog(arg1) {
-  return window['go']['main']['App']['SaveReportDialog'](arg1);
+export function SaveReport(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveReport'](arg1, arg2, arg3);
 }
 
 export function SelectKeysDirectory() {

@@ -15,9 +15,9 @@ type HistoryState = {
   log: HistoryItem;
 };
 
-type UseMatrixReturn = {
+export type UseMatrixReturn = {
   matrixInfo: MatrixInfo | null;
-  setMatrixInfo: Dispatch<SetStateAction<MatrixInfo | null>>; // ★ この行を追加
+  setMatrixInfo: Dispatch<SetStateAction<MatrixInfo | null>>;
   rows: TraitRow[];
   traits: Trait[];
   matrixName: string;
@@ -127,6 +127,7 @@ export function useMatrix(): UseMatrixReturn {
     setHistory((prev) => {
       const base = prev.slice(0, historyIndex + 1);
       const next = [...base, newState];
+      console.log(`[useMatrix/pushHistory] Pushing new state. New history length: ${next.length}`, { newLog: log, newFullHistory: next });
       setHistoryIndex(base.length);
       return next;
     });
@@ -339,7 +340,12 @@ export function useMatrix(): UseMatrixReturn {
     sortBy, setSortBy,
     suggAlgo, setSuggAlgo,
     pickKey, keys, activeKey, refreshKeys,
-    currentHistoryLogs,
+    // ★★★★★ 修正箇所 ★★★★★
+    // currentHistoryLogs は history と historyIndex から計算されるため、
+    // Reactに変更を正しく検知させるには、元のstate変数を依存配列に含める必要があります。
+    history, 
+    historyIndex,
+    // ★★★★★ 修正箇所 ★★★★★
     undo, redo, canUndo, canRedo,
     lang, setLang,
   ]);

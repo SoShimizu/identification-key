@@ -10,8 +10,6 @@ export function CreateNewMatrix(arg1:string):Promise<void>;
 
 export function EnsureMyKeysAndSamples():Promise<void>;
 
-export function GenerateIdentificationReport(arg1:main.ReportRequest,arg2:string):Promise<void>;
-
 export function GenerateUUID():Promise<string>;
 
 export function GetCurrentKeyName():Promise<string>;
@@ -38,7 +36,7 @@ export function PickKey(arg1:string):Promise<void>;
 
 export function SaveMatrix(arg1:string,arg2:main.MatrixData):Promise<void>;
 
-export function SaveReportDialog(arg1:string):Promise<string>;
+export function SaveReport(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SelectKeysDirectory():Promise<string>;
 

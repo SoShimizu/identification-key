@@ -1,7 +1,6 @@
 // frontend/src/components/tabs/key/KeyTabPanel.tsx
 import React, { useState } from 'react';
 import { Box, Drawer, Paper, Typography } from '@mui/material';
-import { useMatrix } from '../../../hooks/useMatrix'; 
 import CandidatesPanel from '../../panels/candidates/CandidatesPanel';
 import ComparisonPanel from '../../panels/comparison/ComparisonPanel';
 import TraitsTabsPanel from '../../panels/traits/TraitsTabsPanel';
@@ -10,6 +9,7 @@ import HelpDisplay from '../../panels/traits/HelpDisplay';
 import { STR } from '../../../i18n';
 import { Taxon, Trait } from '../../../api';
 import MatrixInfoPanel from '../../panels/matrix/MatrixInfoPanel';
+import { UseMatrixReturn } from '../../../hooks/useMatrix'; // ★ インポート
 
 const ResizerX = ({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) => (
     <Box onMouseDown={onMouseDown} sx={{ width: '8px', cursor: 'col-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', my: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -22,7 +22,12 @@ const ResizerY = ({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void 
     </Box>
 );
 
-export const KeyTabPanel: React.FC = () => {
+// ★ Propsの型を定義
+interface KeyTabPanelProps {
+    matrixState: UseMatrixReturn;
+}
+
+export const KeyTabPanel: React.FC<KeyTabPanelProps> = ({ matrixState }) => { // ★ Propsを受け取る
     const {
         matrixInfo,
         taxaCount, rows, traits,
@@ -32,7 +37,7 @@ export const KeyTabPanel: React.FC = () => {
         opts, setOpts,
         undo, redo, canUndo, canRedo,
         lang,
-    } = useMatrix();
+    } = matrixState; // ★ 受け取ったPropsから状態を展開
 
     const [comparisonList, setComparisonList] = useState<string[]>([]);
     const [comparisonOpen, setComparisonOpen] = useState(false);

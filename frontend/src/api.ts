@@ -53,7 +53,7 @@ export type Taxon = {
     id: string;
     name: string;
     scientificName: string;
-    rank?: string; // <-- 修正：この行を追加
+    rank?: string;
     taxonAuthor?: string;
     vernacularName_en?: string;
     vernacularName_ja?: string;
@@ -90,7 +90,7 @@ export type TraitSuggestion = engine.TraitSuggestion & {
 };
 export type ApplyOptions = main.ApplyOptions;
 export type ApplyResult = main.ApplyResultEx;
-export type ReportRequest = main.ReportRequest;
+// ★ 削除: export type ReportRequest = main.ReportRequest;
 
 export type JustificationItem = {
     traitName: string;

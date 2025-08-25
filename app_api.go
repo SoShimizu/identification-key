@@ -4,18 +4,24 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
+	"regexp"
 	"strings"
-	"time"
 
 	"my-id-key/backend/engine"
 
-	"github.com/google/uuid"
+	"baliance.com/gooxml/color"
+	"baliance.com/gooxml/document"
+	"baliance.com/gooxml/schema/soo/wml"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/net/html"
 )
+
+// (他の関数 ... EnsureMyKeysAndSamplesからApplyFiltersAlgoOptまでは変更ありません)
+// ...
 
 // EnsureMyKeysAndSamples
 // keys/ と help_materials/ を確認し、空ならデモファイル群を自動生成
@@ -25,12 +31,10 @@ func (a *App) EnsureMyKeysAndSamples() error {
 		return fmt.Errorf("failed to create keys directory: %w", err)
 	}
 
-	// --- NEW: Ensure help_materials directory and sample image exist ---
 	materialsDir := filepath.Join(a.basePath, "help_materials")
 	if err := os.MkdirAll(materialsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create help_materials directory: %w", err)
 	}
-	// Create reports directory
 	reportsDir := filepath.Join(a.basePath, "my_identification_reports")
 	if err := os.MkdirAll(reportsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create my_identification_reports directory: %w", err)
@@ -38,7 +42,6 @@ func (a *App) EnsureMyKeysAndSamples() error {
 
 	sampleImagePath := filepath.Join(materialsDir, "sample_image.png")
 	if _, err := os.Stat(sampleImagePath); os.IsNotExist(err) {
-		// Image does not exist, so create it
 		pngData, err := createPlaceholderImage()
 		if err != nil {
 			log.Printf("Failed to generate placeholder image: %v", err)
@@ -50,15 +53,12 @@ func (a *App) EnsureMyKeysAndSamples() error {
 		}
 		log.Printf("Successfully created sample image at: %s", sampleImagePath)
 	}
-	// --- END NEW ---
 
-	// Check if sample keys need to be created
 	list, _ := a.listXLSX()
 	if len(list) > 0 {
 		return nil
 	}
 
-	// --- NEW: Write updated samples ---
 	if err := writeSampleSakura(filepath.Join(a.keysDir, "Sample_Sakura.xlsx")); err != nil {
 		return err
 	}
@@ -129,11 +129,9 @@ func (a *App) GetTaxonDetails(taxonID string) (*engine.Taxon, error) {
 
 // GetHelpImage: ヘルプ画像を読み込んでBase64エンコードされた文字列として返す
 func (a *App) GetHelpImage(filename string) (string, error) {
-	// Try help_materials first, then fall back to keys directory for taxon images
 	imgPath := filepath.Join(a.basePath, "help_materials", filename)
 
 	if _, err := os.Stat(imgPath); os.IsNotExist(err) {
-		// Fallback for taxon images which might be placed alongside keys
 		imgPath = filepath.Join(a.keysDir, filename)
 	}
 
@@ -196,155 +194,110 @@ func (a *App) ApplyFiltersAlgoOpt(req ApplyRequest) (*ApplyResultEx, error) {
 	}, nil
 }
 
-// SaveReportDialog displays a save file dialog for the report.
-func (a *App) SaveReportDialog(defaultName string) (string, error) {
-	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		DefaultDirectory: a.reportsDir,
-		DefaultFilename:  defaultName,
-		Title:            "Save Identification Report",
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "Text Files (*.txt)",
-				Pattern:     "*.txt",
-			},
-		},
-	})
+// SaveReport はフロントエンドから受け取ったHTMLコンテンツを指定された形式で保存します。
+func (a *App) SaveReport(htmlContent string, format string, defaultName string) (string, error) {
+	var dialogOptions runtime.SaveDialogOptions
+	if format == "docx" {
+		dialogOptions = runtime.SaveDialogOptions{
+			DefaultDirectory: a.reportsDir,
+			DefaultFilename:  strings.Replace(defaultName, ".txt", ".docx", 1),
+			Title:            "Save Report as Word Document",
+			Filters:          []runtime.FileFilter{{DisplayName: "Word Documents (*.docx)", Pattern: "*.docx"}},
+		}
+	} else {
+		dialogOptions = runtime.SaveDialogOptions{
+			DefaultDirectory: a.reportsDir,
+			DefaultFilename:  defaultName,
+			Title:            "Save Report as Text File",
+			Filters:          []runtime.FileFilter{{DisplayName: "Text Files (*.txt)", Pattern: "*.txt"}},
+		}
+	}
+
+	path, err := runtime.SaveFileDialog(a.ctx, dialogOptions)
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // ユーザーがキャンセル
+	}
+
+	if format == "docx" {
+		err = saveAsDocx(htmlContent, path)
+	} else {
+		err = saveAsTxt(htmlContent, path)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
 }
 
-// GenerateIdentificationReport generates a human-readable text report of the identification session and saves it to the path chosen by the user.
-// GenerateIdentificationReport generates a human-readable text report.
-func (a *App) GenerateIdentificationReport(req ReportRequest, path string) error {
+// saveAsTxt はHTMLをプレーンテキストに変換して保存します。
+func saveAsTxt(htmlContent string, path string) error {
+	re := regexp.MustCompile("<[^>]*>")
+	plainText := re.ReplaceAllString(htmlContent, "")
+	plainText = html.UnescapeString(plainText)
+	return os.WriteFile(path, []byte(plainText), 0644)
+}
 
-	s := getReportStrings(req.Lang)
+// saveAsDocx はHTMLをDOCXに変換して保存します。
+func saveAsDocx(htmlContent string, path string) error {
+	doc := document.New()
+	tokenizer := html.NewTokenizer(strings.NewReader(htmlContent))
 
-	var sb strings.Builder
+	var currentPara document.Paragraph
+	var isBold, isItalic, isUnderline bool
 
-	// Header
-	sb.WriteString("==================================================\n")
-	sb.WriteString(fmt.Sprintf("       %s\n", s.Title))
-	sb.WriteString("==================================================\n\n")
-	sb.WriteString(fmt.Sprintf("%s: %s\n", s.ReportID, uuid.New().String()))
-	sb.WriteString(fmt.Sprintf("%s: %s\n", s.Date, time.Now().Format("2006-01-02 15:04:05 MST")))
-	sb.WriteString("\n")
+	currentPara = doc.AddParagraph()
 
-	// Matrix Info
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("%s\n", s.MatrixInfoTitle))
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixFile, req.MatrixName))
-	matrixTitle := req.MatrixInfo.TitleEN
-	if req.Lang == "ja" && req.MatrixInfo.TitleJP != "" {
-		matrixTitle = req.MatrixInfo.TitleJP
-	}
-	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixTitle, matrixTitle))
-	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixVersion, req.MatrixInfo.Version))
-	matrixAuthors := req.MatrixInfo.AuthorsEN
-	if req.Lang == "ja" && req.MatrixInfo.AuthorsJP != "" {
-		matrixAuthors = req.MatrixInfo.AuthorsJP
-	}
-	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixAuthors, matrixAuthors))
-	matrixCitation := req.MatrixInfo.CitationEN
-	if req.Lang == "ja" && req.MatrixInfo.CitationJP != "" {
-		matrixCitation = req.MatrixInfo.CitationJP
-	}
-	if matrixCitation != "" {
-		sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.MatrixCitation, matrixCitation))
-	}
-	sb.WriteString("\n")
-
-	// Parameters
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("%s\n", s.ParametersUsed))
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("  - %s: %s\n", s.Algorithm, req.Algorithm))
-	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Alpha, req.Options.DefaultAlphaFP))
-	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Beta, req.Options.DefaultBetaFN))
-	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Gamma, req.Options.GammaNAPenalty))
-	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.Kappa, req.Options.Kappa))
-	sb.WriteString(fmt.Sprintf("  - %s: %.4f\n", s.ConflictPenalty, req.Options.ConflictPenalty))
-	sb.WriteString(fmt.Sprintf("  - %s: %.2f%%\n", s.Tolerance, req.Options.ToleranceFactor*100))
-	sb.WriteString("\n")
-
-	// Observation History
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("%s\n", s.ObservationHistory))
-	sb.WriteString("--------------------------------------------------\n")
-	if len(req.History) == 0 {
-		sb.WriteString(fmt.Sprintf("  %s\n", s.NoObservations))
-	} else {
-		sort.SliceStable(req.History, func(i, j int) bool {
-			return req.History[i].Timestamp < req.History[j].Timestamp
-		})
-		for i, item := range req.History {
-			sb.WriteString(fmt.Sprintf("  %d. %s: %s\n", i+1, item.TraitName, item.Selection))
-		}
-	}
-	sb.WriteString("\n")
-
-	// Final Results
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("%s\n", s.FinalRanking))
-	sb.WriteString("--------------------------------------------------\n")
-	if len(req.FinalScores) == 0 {
-		sb.WriteString(fmt.Sprintf("  %s\n", s.NoCandidates))
-	} else {
-		header := fmt.Sprintf("%-6s %-40s %-15s %-12s %-10s\n", s.RankHeader, s.TaxonHeader, s.ScoreHeader, s.ConflictsHeader, s.MatchSupportHeader)
-		sb.WriteString(header)
-		sb.WriteString(strings.Repeat("-", 85) + "\n")
-		for i, score := range req.FinalScores {
-			if i >= 10 {
-				sb.WriteString(fmt.Sprintf("  "+s.AndMore+"\n", len(req.FinalScores)-10))
-				break
+	for {
+		tt := tokenizer.Next()
+		switch tt {
+		case html.ErrorToken:
+			if tokenizer.Err() == io.EOF {
+				return doc.SaveToFile(path)
 			}
-			probStr := fmt.Sprintf("%.4f", score.Post)
-			matchSupport := fmt.Sprintf("%d/%d", score.Match, score.Support)
+			return fmt.Errorf("error tokenizing html: %v", tokenizer.Err())
 
-			// CORRECTED: Format scientific name with asterisks for italics
-			formattedName := fmt.Sprintf("*%s %s*", score.Taxon.Genus, score.Taxon.Species)
-			if score.Taxon.Subspecies != "" {
-				formattedName += fmt.Sprintf(" *%s*", score.Taxon.Subspecies)
+		case html.TextToken:
+			text := html.UnescapeString(string(tokenizer.Text()))
+			if len(text) > 0 {
+				run := currentPara.AddRun()
+				run.AddText(text)
+				props := run.Properties()
+				props.SetBold(isBold)
+				props.SetItalic(isItalic)
+				if isUnderline {
+					props.SetUnderline(wml.ST_Underline_Single, color.Auto)
+				}
 			}
 
-			sb.WriteString(fmt.Sprintf("%-6d %-40s %-15s %-12d %-10s\n", i+1, formattedName, probStr, score.Conflicts, matchSupport))
-		}
-	}
-	sb.WriteString("\n")
+		case html.StartTagToken, html.EndTagToken:
+			tn, _ := tokenizer.TagName()
+			tagName := string(tn)
 
-	// Confidence Score
-	var confidence string
-	if len(req.FinalScores) >= 2 {
-		if req.FinalScores[1].Post > 1e-9 { // Avoid division by zero
-			ratio := req.FinalScores[0].Post / req.FinalScores[1].Post
-			if ratio > 2.0 {
-				confidence = fmt.Sprintf(s.ConfidenceHigh, ratio)
-			} else {
-				confidence = s.ConfidenceContested
+			if tagName == "p" || tagName == "h1" {
+				if tt == html.StartTagToken {
+					currentPara = doc.AddParagraph()
+					if tagName == "h1" {
+						currentPara.Properties().SetStyle("Heading1")
+					}
+				} else {
+					isBold, isItalic, isUnderline = false, false, false
+				}
+			} else if tagName == "strong" || tagName == "b" {
+				isBold = (tt == html.StartTagToken)
+			} else if tagName == "em" || tagName == "i" {
+				isItalic = (tt == html.StartTagToken)
+			} else if tagName == "u" {
+				isUnderline = (tt == html.StartTagToken)
+			} else if tagName == "br" && tt == html.StartTagToken {
+				currentPara.AddRun().AddBreak()
 			}
-		} else {
-			confidence = s.ConfidenceVeryHigh
 		}
-	} else if len(req.FinalScores) == 1 {
-		confidence = s.ConfidenceAbsolute
-	} else {
-		confidence = s.ConfidenceNA
 	}
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("%s\n", s.ConfidenceTitle))
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("  %s\n\n", confidence))
-	sb.WriteString(fmt.Sprintf("  %s\n\n", s.ConfidenceDisclaimer))
-
-	// Citation Note
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("%s\n", s.CitationTitle))
-	sb.WriteString("--------------------------------------------------\n")
-	sb.WriteString(fmt.Sprintf("  %s\n\n", s.CitationText))
-
-	sb.WriteString("==================================================\n")
-	sb.WriteString(fmt.Sprintf("               %s\n", s.EndOfReport))
-	sb.WriteString("==================================================\n")
-
-	return os.WriteFile(path, []byte(sb.String()), 0644)
 }
 
 // GetJustificationForTaxon returns a breakdown of which traits match, conflict, or are unobserved for a given taxon.
@@ -372,17 +325,15 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 	for _, t := range a.currentMatrix.Traits {
 		traitMap[t.ID] = t
 		if t.Type == "nominal_parent" {
-			parentTraits[t.NameEN] = t // Using NameEN as key
+			parentTraits[t.NameEN] = t
 		}
 		if t.Parent != "" {
-			// Using Parent TraitID as key
 			childrenMap[t.Parent] = append(childrenMap[t.Parent], t)
 		}
 	}
 
 	justification := &Justification{}
 
-	// Create a map of all user selections for easier lookup
 	allSelections := make(map[string]bool)
 	for k := range selected {
 		allSelections[k] = true
@@ -392,7 +343,6 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 	}
 
 	for _, trait := range a.currentMatrix.Traits {
-		// Skip derived traits, they are handled via their parent
 		if trait.Type == "derived" {
 			continue
 		}
@@ -401,7 +351,6 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 		taxonStateStr := "NA"
 		status := "unobserved"
 
-		// Check if this trait (or its children) were selected by the user
 		isSelected := false
 		if _, ok := allSelections[trait.ID]; ok {
 			isSelected = true
@@ -423,7 +372,6 @@ func (a *App) GetJustificationForTaxon(taxonID string, selected map[string]int, 
 			continue
 		}
 
-		// --- Process selected traits ---
 		switch trait.Type {
 		case "binary":
 			userChoice, _ := selected[trait.ID]
@@ -539,7 +487,6 @@ func ternaryToString(t engine.Ternary) string {
 	}
 }
 
-// hasIntersection checks if there is at least one common element.
 func hasIntersection(set1, set2 []string) bool {
 	map1 := make(map[string]struct{}, len(set1))
 	for _, item := range set1 {

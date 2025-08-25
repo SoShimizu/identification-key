@@ -5,9 +5,11 @@ go 1.23.0
 toolchain go1.24.6
 
 require (
+	baliance.com/gooxml v1.0.0
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v2 v2.10.2
 	github.com/xuri/excelize/v2 v2.9.1
+	golang.org/x/net v0.40.0
 )
 
 require (
@@ -39,7 +41,6 @@ require (
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.1 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 )
