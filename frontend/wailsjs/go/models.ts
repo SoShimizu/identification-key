@@ -575,6 +575,22 @@ export namespace main {
 	        this.modTime = source["modTime"];
 	    }
 	}
+	export class MatrixData {
+	    matrixInfo: string[][];
+	    taxaInfo: string[][];
+	    traits: string[][];
+	
+	    static createFrom(source: any = {}) {
+	        return new MatrixData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.matrixInfo = source["matrixInfo"];
+	        this.taxaInfo = source["taxaInfo"];
+	        this.traits = source["traits"];
+	    }
+	}
 	export class ReportRequest {
 	    lang: string;
 	    matrixName: string;

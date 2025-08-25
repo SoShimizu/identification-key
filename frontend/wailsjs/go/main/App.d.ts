@@ -6,9 +6,13 @@ import {context} from '../models';
 
 export function ApplyFiltersAlgoOpt(arg1:main.ApplyRequest):Promise<main.ApplyResultEx>;
 
+export function CreateNewMatrix(arg1:string):Promise<void>;
+
 export function EnsureMyKeysAndSamples():Promise<void>;
 
 export function GenerateIdentificationReport(arg1:main.ReportRequest,arg2:string):Promise<void>;
+
+export function GenerateUUID():Promise<string>;
 
 export function GetCurrentKeyName():Promise<string>;
 
@@ -16,14 +20,26 @@ export function GetHelpImage(arg1:string):Promise<string>;
 
 export function GetJustificationForTaxon(arg1:string,arg2:Record<string, number>,arg3:Record<string, Array<string>>):Promise<main.Justification>;
 
+export function GetKeysDirectory():Promise<string>;
+
 export function GetMatrix():Promise<engine.Matrix>;
 
 export function GetTaxonDetails(arg1:string):Promise<engine.Taxon>;
 
+export function ListHelperImages():Promise<Array<string>>;
+
+export function ListMatrixFiles():Promise<Array<string>>;
+
 export function ListMyKeys():Promise<Array<main.KeyInfo>>;
+
+export function LoadMatrix(arg1:string):Promise<main.MatrixData>;
 
 export function PickKey(arg1:string):Promise<void>;
 
+export function SaveMatrix(arg1:string,arg2:main.MatrixData):Promise<void>;
+
 export function SaveReportDialog(arg1:string):Promise<string>;
+
+export function SelectKeysDirectory():Promise<string>;
 
 export function Startup(arg1:context.Context):Promise<void>;

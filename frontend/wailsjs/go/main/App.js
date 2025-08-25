@@ -6,12 +6,20 @@ export function ApplyFiltersAlgoOpt(arg1) {
   return window['go']['main']['App']['ApplyFiltersAlgoOpt'](arg1);
 }
 
+export function CreateNewMatrix(arg1) {
+  return window['go']['main']['App']['CreateNewMatrix'](arg1);
+}
+
 export function EnsureMyKeysAndSamples() {
   return window['go']['main']['App']['EnsureMyKeysAndSamples']();
 }
 
 export function GenerateIdentificationReport(arg1, arg2) {
   return window['go']['main']['App']['GenerateIdentificationReport'](arg1, arg2);
+}
+
+export function GenerateUUID() {
+  return window['go']['main']['App']['GenerateUUID']();
 }
 
 export function GetCurrentKeyName() {
@@ -26,6 +34,10 @@ export function GetJustificationForTaxon(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetJustificationForTaxon'](arg1, arg2, arg3);
 }
 
+export function GetKeysDirectory() {
+  return window['go']['main']['App']['GetKeysDirectory']();
+}
+
 export function GetMatrix() {
   return window['go']['main']['App']['GetMatrix']();
 }
@@ -34,16 +46,36 @@ export function GetTaxonDetails(arg1) {
   return window['go']['main']['App']['GetTaxonDetails'](arg1);
 }
 
+export function ListHelperImages() {
+  return window['go']['main']['App']['ListHelperImages']();
+}
+
+export function ListMatrixFiles() {
+  return window['go']['main']['App']['ListMatrixFiles']();
+}
+
 export function ListMyKeys() {
   return window['go']['main']['App']['ListMyKeys']();
+}
+
+export function LoadMatrix(arg1) {
+  return window['go']['main']['App']['LoadMatrix'](arg1);
 }
 
 export function PickKey(arg1) {
   return window['go']['main']['App']['PickKey'](arg1);
 }
 
+export function SaveMatrix(arg1, arg2) {
+  return window['go']['main']['App']['SaveMatrix'](arg1, arg2);
+}
+
 export function SaveReportDialog(arg1) {
   return window['go']['main']['App']['SaveReportDialog'](arg1);
+}
+
+export function SelectKeysDirectory() {
+  return window['go']['main']['App']['SelectKeysDirectory']();
 }
 
 export function Startup(arg1) {

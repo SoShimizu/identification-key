@@ -1,4 +1,3 @@
-// backend/types.go
 package main
 
 import "my-id-key/backend/engine"
@@ -85,4 +84,12 @@ type ReportRequest struct {
 	History     []HistoryItem       `json:"history"`
 	FinalScores []engine.TaxonScore `json:"finalScores"`
 	MatrixInfo  engine.MatrixInfo   `json:"matrixInfo"`
+}
+
+// MatrixData はマトリクス編集画面用のデータ構造です。
+// CSVの行と列をそのまま二次元配列で保持します。
+type MatrixData struct {
+	MatrixInfo [][]string `json:"matrixInfo"`
+	TaxaInfo   [][]string `json:"taxaInfo"`
+	Traits     [][]string `json:"traits"`
 }

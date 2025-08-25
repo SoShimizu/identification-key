@@ -1,304 +1,242 @@
+[English version](#English_version) • [日本語版](#日本語版)
+
+<!--ここにアイコン画像を入れる-->
+
 # MyKeyLogue
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.22+">
+  <!-- JOSS採択後にDOIバッジを追加 -->
+  <!-- <a href="https://doi.org/10.5281/zenodo.XXXXXXX"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg" alt="DOI"></a> -->
+  <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white" alt="Go 1.22+">
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5.x">
   <img src="https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black" alt="React 18">
   <img src="https://img.shields.io/badge/Wails-v2-8A2BE2" alt="Wails v2">
-  <img src="https://img.shields.io/badge/Windows%20|%20macOS%20|%20Linux-2ea44f" alt="Windows | macOS | Linux">
+  <img src="https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey" alt="Windows | macOS | Linux">
 </p>
-
-<!-- 任意: アプリアイコン -->
-<!-- <p align="center"><img src="readme_images/app-icon.png" alt="App icon" width="128"></p> -->
 
 <p align="center">
-  <img alt="MyKeyLogue main screen / メイン画面" src="readme_images/sample.png" width="720">
+  <img alt="MyKeyLogue main screen / メイン画面" src="readme_images/sample.png" width="800">
 </p>
 
-## README Language / 表示言語
+---
 
-[English](#english) • [日本語](#日本語)
+## English_version
 
-## english
+### Overview
+
+**MyKeyLogue** is a cross-platform desktop application that generates and runs **interactive multi-access keys** directly from an **Excel-based trait matrix**. It empowers users to input observable characters in any order and dynamically filters candidates. The software's Bayesian inference engine helps navigate uncertainty by highlighting the most plausible taxa based on the evidence provided, making it a powerful tool for taxonomic research, education, and citizen science.
+
+### Key Features
+
+- **Cross-platform**: Natively runs on Windows, macOS, and Linux.
+- **Matrix-First Workflow**: Author and manage complex identification keys in the familiar and accessible environment of Microsoft Excel. The application reads the `.xlsx` file directly, streamlining the key creation process.
+- **Statistical Identification Engine**: Employs a **Bayesian inference model** to recompute candidate probabilities after each trait selection. The engine's parameters are adjustable, allowing users to fine-tune its tolerance for observational errors and data ambiguity.
+- **Rich Interactive UI**: Features a comprehensive interface including a live-updating candidate list, a filterable trait list with integrated help text and images, detailed taxon information panels, a complete selection history, "Why?" justifications for scoring, and a side-by-side **Compare** view to highlight diagnostic differences.
+- **Pragmatic Trait Recommendation**: Suggests the most effective next traits to observe, balancing statistical utility (information gain), user-defined observation difficulty, and potential for misinterpretation (risk).
+- **Multilingual Support**: The user interface is fully available in both English and Japanese.
 
 ---
 
-## Overview
+### Installation
 
-## MyKeyLogue generates and runs **multi-access keys** directly from an **Excel-based trait matrix**, enabling you to input observable characters in any order and dynamically filter candidates. Bayesian-style scoring helps under uncertainty by highlighting the most plausible taxa.
-
-## Key Features
-
-- **Cross-platform**  
-  Runs on Windows / macOS / Linux.
-- **Matrix-first workflow**  
-  Author and edit keys in familiar Excel; the app reads matrices directly.
-- **Statistical identification engine**  
-  Recomputes candidate probabilities after each trait selection; adjustable tolerance for missing or ambiguous data.
-- **Interactive UI**  
-  Candidate list, trait list with help text & images, detail panes, selection history, “Why?” explanations, and **Compare** view.
-- **Multilingual UI**  
-  English and Japanese supported.
-
----
-
-## Quick Start
-
-1. **Prepare your dataset**  
-   On first launch, the app creates sibling folders:  
-    `keys/` (matrices), `help_materials/` (help images), `my_identification_reports/` (reports). Use sample Excel files in `keys/` as templates.
-2. **Identify**  
-   Select observable traits (any order). The candidate list updates live with a **recommendation score** that reflects statistical utility, difficulty, and risk.
-3. **Interpret results**  
-   Click a candidate taxon for details; use **Why?** to see matches/conflicts; **Compare** multiple taxa to highlight diagnostic differences.  
-    **Note:** Scores are **relative to the loaded matrix**; the true specimen might be outside the key.
-
----
-
-## Data Format (Excel)
-
-Use Excel `.xlsx` with **three sheets**:
-
-| Sheet Name   | Role (EN)                                                           |
-| ------------ | ------------------------------------------------------------------- |
-| `MatrixInfo` | Metadata for the entire key (title, authors, citation, etc.)        |
-| `TaxaInfo`   | List of taxa and details (scientific/vernacular names, description) |
-| `Traits`     | Characters used for identification and their states per taxon       |
-
-### `Traits` Sheet Headers
-
-| Header                        | Required |                                                                                                                                      |
-| ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `#TraitID`                    | Optional | Unique ID (auto-generated from `#Trait_en` if omitted); used for dependencies.                                                       |
-| `#Dependency`                 | Optional | `parent_trait_id=state_name`; only show when the parent has the specified state.                                                     |
-| `#Group_en / #Group_ja`       | Required | Grouping label (e.g., Head, Wings).                                                                                                  |
-| `#Trait_en / #Trait_ja`       | Required | Character name shown in the UI.                                                                                                      |
-| `#Type`                       | Required | Character type (see below).                                                                                                          |
-| `#HelpText_en / #HelpText_ja` | Optional | Definition and how-to-observe; displayed in help panel.                                                                              |
-| `#HelpImages`                 | Optional | Comma-separated image filenames in `help_materials/`. 。                                                                             |
-| `#Difficulty`                 | Optional | Observation difficulty; affects recommendation. Accepted: `Easy`, `Normal`, `Hard`, `Very Hard`, or a positive number.               |
-| `#Risk`                       | Optional | Misinterpretation risk; affects recommendation. Accepted: `Lowest`, `Low`, `Medium`, `High`, `Highest`, or a number between 0 and 1. |
-
-#### Character Types
-
-- `binary`: presence/absence (e.g., `1`, `y`, `present` = Yes; `-1`, `n`, `absent` = No)
-- `nominal_parent`: multiple **exclusive** states (e.g., body color)
-- `continuous`: numeric values
-- `categorical_multi`: multiple **simultaneous** states (e.g., distribution)
-
-**Best Practices**  
-Prefer objective traits (e.g., “Punctate: yes/no”) and move nuance into help text, instead of vague scales like “weakly punctate.”
-
----
-
-## Installation
-
-**Prereqs**
+**Prerequisites**
 
 - Go **1.18+**
 - Node.js **16+**
-- Wails CLI
+- Wails CLI v2
 
 ```bash
-# Install Wails
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
+# 1. Install Wails CLI
+go install [github.com/wailsapp/wails/v2/cmd/wails@latest](https://github.com/wailsapp/wails/v2/cmd/wails@latest)
 
-# Clone and enter
-git clone https://github.com/soshimizu/identification-key.git
-cd identification-key
+# 2. Clone the repository
+git clone [https://github.com/soshimizu/MyKeyLogue.git](https://github.com/soshimizu/MyKeyLogue.git)
+cd MyKeyLogue
 
-# Install frontend deps
+# 3. Install frontend dependencies
 cd frontend && npm install && cd ..
 
-# Build the app
+# 4. Build the application
 wails build
 ```
 
-Artifacts will be in `build/bin/`.
+The compiled executable will be located in the `build/bin/` directory.
 
 ---
 
-## Usage
+### Quick Start Guide
 
-1. **Launch**: run the executable in `build/bin/`.
-2. **Load matrix**: choose a matrix from the top dropdown.
-3. **Select traits**: pick any observable traits; candidates update live.
-4. **Inspect**: click a candidate for details; use **Why?** to view supporting/conflicting traits; **Compare** for side-by-side differences.
-5. **Reports**: outputs are saved under `my_identification_reports/`.
-
----
-
-## Contributing
-
-Issues and PRs are welcome. Please discuss large changes in an issue first.
-
-- GitHub: [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
-- Issues: [https://github.com/soshimizu/identification-key/issues](https://github.com/soshimizu/identification-key/issues)
+1.  **Launch the Application**: On the first run, MyKeyLogue will automatically create three directories next to the executable:
+    - `keys/`: Place your Excel matrix (`.xlsx`) files here. Sample matrices are included on first launch.
+    - `help_materials/`: Store help images referenced in your matrices here.
+    - `my_identification_reports/`: Identification reports will be saved here.
+2.  **Load a Matrix**: Select an identification key from the dropdown menu at the top of the window. Use the refresh button next to the dropdown to rescan the `keys/` directory for new files.
+3.  **Perform Identification**: Select observable traits from the bottom-right panel in any order. The candidate list in the top-right panel will update in real-time. Traits are sorted by a recommendation score to guide you to an efficient identification.
+4.  **Interpret Results**:
+    - Click a taxon in the candidate list to view its detailed information (description, images, etc.) in the bottom-left panel.
+    - Click the **"Why?"** button (question mark icon) next to a candidate to see a breakdown of matching and conflicting traits.
+    - Select multiple taxa and use the **"Compare"** button to view their trait states side-by-side, highlighting diagnostic differences.
+5.  **Generate a Report**: Once your identification is complete, you can export a detailed report of your session.
 
 ---
 
-## Citation
+### Data Format (Excel)
 
-**EN (software):**
-Shimizu S. (2025) _MyKeyLogue: A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification._ [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
+An identification key is defined by an Excel (`.xlsx`) file containing three required sheets: `MatrixInfo`, `TaxaInfo`, and `Traits`.
 
-**Matrices:**
-When publishing results built with a given matrix, cite the matrix as specified by its author **in addition** to citing this software.
+| Sheet Name   | Role                                                                 |
+| :----------- | :------------------------------------------------------------------- |
+| `MatrixInfo` | Contains metadata for the key (e.g., title, authors, citation).      |
+| `TaxaInfo`   | Defines each taxon and its details (e.g., names, rank, description). |
+| `Traits`     | The core matrix defining characters and their states for each taxon. |
 
----
-
-## License
-
-## **EN:** Released under the **MIT License**. See [`LICENSE`](LICENSE).
-
-## Author
-
-So Shimizu, PhD
-
-- Email: [parasitoidwasp.sou@gmail.com](mailto:parasitoidwasp.sou@gmail.com)
-- Affiriation: NARO
-- Personal homepage: [https://soshimizu.com/](https://soshimizu.com/)
-- Database: [https://ichneumonoidea-world.com/](https://ichneumonoidea-world.com/)
-
-## 日本語
+For detailed specifications of all headers, please refer to the sample files provided by the application.
 
 ---
 
-## 概要
+### Community and Contributing
 
-## **Excel の形質マトリクス**から**マルチアクセスキー**を自動生成・実行します。観察可能な形質を**順不同**で入力して候補を動的に絞り込み、**ベイズ的な確率評価**により不確実性下でも最も有力な候補を提示します。
+Bug reports, feature requests, and pull requests are highly welcome. Please open an issue to discuss any substantial changes before implementation.
 
-## 主要機能
-
-- **クロスプラットフォーム**  
-  Windows / macOS / Linux で動作。
-- **Matrix-first workflow**  
-  なじみのある **Excel** で検索表を作成・編集し、そのまま読み込み。
-- **統計的アルゴリズムに基づく検索表エンジン**  
-  形質選択ごとに候補の**確率**を再計算。欠損や曖昧さへの許容度を調整可能。
-- **対話型 UI**  
-  候補リスト、形質一覧（ヘルプ/画像）、詳細パネル、選択履歴、**Why?** の根拠表示、**比較**機能。
-- **多言語対応 UI**  
-  **英語 / 日本語**に対応。
+- **GitHub Repository**: [https://github.com/soshimizu/MyKeyLogue](https://github.com/soshimizu/MyKeyLogue)
+- **Issue Tracker**: [https://github.com/soshimizu/MyKeyLogue/issues](https://github.com/soshimizu/MyKeyLogue/issues)
 
 ---
 
-## クイックスタート
+### Citation
 
-1. \*\*データセットの用意  
-   初回起動時に `keys/`（マトリクス）, `help_materials/`（補助画像）, `my_identification_reports/`（レポート）を自動生成。`keys/` 内のサンプル Excel を雛形に編集。
-2. **検索手順**  
-   観察できる形質を**順不同**で選択。統計的有効度・**難易度**・**リスク**を考慮した推奨スコアで効率的に絞り込み。
-3. **結果の解釈**  
-   候補名から詳細へ。**Why?** で一致/矛盾の根拠を確認し、**比較**で識別点を把握。  
-    **注意:** Scores are **relative to the loaded matrix**; the true specimen might be outside the key.
+If you use MyKeyLogue in your research, please cite both the software and the specific identification key (matrix) you used.
 
----
+**Software:**
 
-## データ形式（Excel）
+> Shimizu, S. (2025). _MyKeyLogue: A cross-platform desktop application for creating and using interactive multi-access taxonomic keys using statistical algorithms_. Journal of Open Source Software, X(Y), ZZZZ. https://doi.org/10.21105/joss.ZZZZZ _(Note: JOSS DOI will be assigned upon acceptance)_
 
-Excel（`.xlsx`）で**3 つのシート**に分割して管理します。
+**Data:**
 
-| Sheet Name   | 役割（JP）                                                 |
-| ------------ | ---------------------------------------------------------- |
-| `MatrixInfo` | マトリクス全体のメタデータ（タイトル、作者、引用情報など） |
-| `TaxaInfo`   | 分類群（Taxon）の一覧と詳細情報（学名・和名・解説など）    |
-| `Traits`     | 同定に使用する形質と、各分類群の形質状態                   |
-
-### `Traits` シートの主なヘッダー
-
-| Header                        | Required |                                                                                     |
-| ----------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `#TraitID`                    | Optional | 形質の一意 ID。省略時は `#Trait_en` から自動生成。依存関係で参照。                  |
-| `#Dependency`                 | Optional | `親TraitID=状態名` 形式。条件成立時のみ UI に表示。                                 |
-| `#Group_en / #Group_ja`       | Required | 形質グループ名（例：頭部、翅）。                                                    |
-| `#Trait_en / #Trait_ja`       | Required | UI に表示される形質名。                                                             |
-| `#Type`                       | Required | 形質の型（後述）。                                                                  |
-| `#HelpText_en / #HelpText_ja` | Optional | 定義・観察方法などの補助説明（ヘルプに表示）。                                      |
-| `#HelpImages`                 | Optional | `help_materials/` に置く画像ファイル名（カンマ区切り）。                            |
-| `#Difficulty`                 | Optional | 観察難易度。推奨度に影響。`Easy` / `Normal` / `Hard` / `Very Hard` または正の数値。 |
-| `#Risk`                       | Optional | 誤判定リスク。推奨度に影響。`Lowest`〜`Highest` または 0〜1 の数値。                |
-
-#### 形質タイプの指針
-
-- `binary`: **有無/はい・いいえ**（`1`,`y`,`present` = Yes / `-1`,`n`,`absent` = No）
-- `nominal_parent`: 相互排他的な**複数状態**（例：体色）
-- `continuous`: **数値**
-- `categorical_multi`: **複数状態が同時**に成り立つ（例：分布域）
-
-**コツ**  
- 「弱く点刻」などの主観的表現は避け、「点刻の有無」のように客観化し、細部はヘルプで補足。
+> Please also cite the matrix authors as specified in the `MatrixInfo` sheet of the key you are using.
 
 ---
 
-## インストール
+### Author and License
+
+Developed by **So Shimizu, PhD** (NARO).
+
+This project is released under the **MIT License**. See the [`LICENSE`](LICENSE) file for details.
+
+---
+
+---
+
+## 日本語版
+
+### ソフトウェアの必要性 (JOSS 向け)
+
+マクロ生物学を中心とした多くの生物学的研究において、対象分類群の正確な同定は、研究の信頼性を左右する根源的かつ最も重要なプロセスです。このプロセスを支えるのが「検索表」ですが、従来主流であった二分岐検索表には構造的な課題がありました。すなわち、形質の欠損や観察の難しさ、解釈の誤りなどにより、一度でも分岐を誤ると正しい同定結果に到達できないという脆弱性を抱えており、その利用には熟練した分類学的技能が求められてきました。
+
+こうした課題を解決する柔軟な手段として、近年、マトリクスベースの多分岐検索表（multi-access key）が注目されています。多分岐検索表は、観察可能な形質を任意の順序で入力でき、観察不能な形質をスキップできるなど、二分岐検索表を大きく超える利点を有します。
+
+しかし、その優れた有用性にもかかわらず、普及は限定的でした。既存のツールの多くは、操作が難解であったり、内部アルゴリズムがブラックボックスであったり、あるいはプログラミング知識を要求するなど、専門家から初心者まで幅広い層が簡便に利用できる状況にはありませんでした。
+
+MyKeyLogue は、このギャップを埋めるために開発された、オープンソースかつクロスプラットフォーム対応のデスクトップアプリケーションです。研究者、博物館、環境調査機関、そして市民科学者に至るまで、幅広いユーザーが使い慣れた Excel 形式で簡単に対話的な検索表を作成・共有・利用できる統合的ソリューションを提供します。さらに、ベイジアン推論エンジンを組み込むことで、同定結果の確からしさを統計的に評価し、科学的に裏付けられた同定を可能にします。MyKeyLogue は、堅牢な同定プロセスを、よりアクセスしやすく、柔軟な形で幅広い科学コミュニティに提供します。
+
+### 概要
+
+**MyKeyLogue**は、**Excel ベースの形質マトリクス**から直接、**対話的な多分岐検索キー**を生成・実行するクロスプラットフォーム対応のデスクトップアプリケーションです。ユーザーは観察可能な形質を任意の順序で入力し、候補を動的に絞り込むことができます。本ソフトウェアのベイジアン推定エンジンは、提供された証拠に基づいて最も確からしい分類群を提示することで不確実な状況下での意思決定を助け、分類学的研究、教育、市民科学のための強力なツールとなります。
+
+### 主要機能
+
+- **クロスプラットフォーム**: Windows, macOS, Linux でネイティブに動作します。
+- **マトリクス中心のワークフロー**: 使い慣れた Microsoft Excel の環境で、複雑な同定キーを作成・管理します。`.xlsx`ファイルを直接読み込むため、キーの作成プロセスが効率化されます。
+- **統計的同定エンジン**: **ベイジアン推定モデル**を採用し、形質が選択されるたびに候補の確率を再計算します。エンジンのパラメータは調整可能で、観察エラーやデータの曖昧さに対する許容度をユーザーが微調整できます。
+- **豊富な対話型 UI**: リアルタイムに更新される候補リスト、ヘルプテキストや画像が統合されたフィルタ可能な形質リスト、詳細な分類群情報パネル、完全な選択履歴、スコアリングの根拠を示す「Why?」機能、そして識別点を強調表示するサイドバイサイドの**比較**ビューなど、包括的なインターフェースを備えています。
+- **実用的な形質推薦**: 次に観察すべき最も効果的な形質を提案します。この推薦は、統計的有用性（情報利得）、ユーザーが定義した観察の難易度、および誤判定のリスクをバランス良く考慮します。
+- **多言語サポート**: ユーザーインターフェースは日本語と英語に完全対応しています。
+
+---
+
+### インストール方法
 
 **前提条件**
 
 - Go **1.18+**
 - Node.js **16+**
-- Wails CLI
+- Wails CLI v2
 
 ```bash
-# Install Wails
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
+# 1. Wails CLIをインストール
+go install [github.com/wailsapp/wails/v2/cmd/wails@latest](https://github.com/wailsapp/wails/v2/cmd/wails@latest)
 
-# Clone and enter
-git clone https://github.com/soshimizu/identification-key.git
-cd identification-key
+# 2. リポジトリをクローン
+git clone [https://github.com/soshimizu/MyKeyLogue.git](https://github.com/soshimizu/MyKeyLogue.git)
+cd MyKeyLogue
 
-# Install frontend deps
+# 3. フロントエンドの依存関係をインストール
 cd frontend && npm install && cd ..
 
-# Build the app
+# 4. アプリケーションをビルド
 wails build
 ```
 
-生成物は `build/bin/` に出力されます。
+コンパイルされた実行ファイルは`build/bin/`ディレクトリに生成されます。
 
 ---
 
-## 使い方
+### クイックスタートガイド
 
-1. **起動**: run the executable in `build/bin/`.
-2. **マトリクス選択**: choose a matrix from the top dropdown.
-3. **形質選択**: pick any observable traits; candidates update live.
-4. **詳細**: click a candidate for details; use **Why?** to view supporting/conflicting traits; **Compare** for side-by-side differences.
-5. **レポート**: outputs are saved under `my_identification_reports/`.
-
----
-
-## 開発・貢献
-
-不具合報告・機能要望・PR 歓迎。大きな変更は事前に Issue で議論してください。
-
-- GitHub: [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
-- Issues: [https://github.com/soshimizu/identification-key/issues](https://github.com/soshimizu/identification-key/issues)
+1.  **アプリケーションの起動**: 初回起動時、MyKeyLogue は実行ファイルの隣に 3 つのディレクトリを自動で作成します。
+    - `keys/`: Excel マトリクス（`.xlsx`）ファイルをここに配置します。初回起動時にはサンプルマトリクスが含まれています。
+    - `help_materials/`: マトリクスで参照される補助画像をここに保存します。
+    - `my_identification_reports/`: 同定レポートがここに保存されます。
+2.  **マトリクスの読み込み**: ウィンドウ上部のドロップダウンメニューから同定キーを選択します。ドロップダウンの隣にある更新ボタンで`keys/`ディレクトリを再スキャンし、新しいファイルを認識させることができます。
+3.  **同定の実行**: 右下のパネルから観察可能な形質を任意の順序で選択します。右上の候補リストはリアルタイムで更新されます。形質は、同定を効率化するための推薦スコア順に並んでいます。
+4.  **結果の解釈**:
+    - 候補リストの分類群をクリックすると、左下のパネルにその詳細情報（解説、画像など）が表示されます。
+    - 候補の隣にある**「Why?」**ボタン（疑問符アイコン）をクリックすると、一致する形質と矛盾する形質の詳細が表示されます。
+    - 複数の分類群を選択して**「比較」**ボタンを使用すると、それらの形質状態を並べて表示し、識別点を明確にできます。
+5.  **レポートの生成**: 同定が完了したら、セッションの詳細なレポートを出力できます。
 
 ---
 
-## 引用
+### データ形式 (Excel)
 
-**ソフトウェア引用:**
-Shimizu S. (2025) _MyKeyLogue: A Software Platform for Interactive Multi-Access Keys in Taxonomic Identification._ [https://github.com/soshimizu/identification-key](https://github.com/soshimizu/identification-key)
+同定キーは、`MatrixInfo`, `TaxaInfo`, `Traits`という 3 つの必須シートを含む単一の Excel (`.xlsx`) ファイルによって定義されます。
 
-**マトリクスの引用:**
-本ソフトで作成・利用したマトリクスを研究等で用いる場合は、**ソフトの引用に加え**、各マトリクス作者が指定する引用情報にも従ってください。
+| シート名     | 役割                                                             |
+| :----------- | :--------------------------------------------------------------- |
+| `MatrixInfo` | キー全体のメタデータ（タイトル、著者、引用情報など）を含みます。 |
+| `TaxaInfo`   | 各分類群とその詳細（学名、和名、階級、解説など）を定義します。   |
+| `Traits`     | 各分類群の形質と形質状態を定義する中心的なマトリクスです。       |
 
----
-
-## ライセンス
-
-本プロジェクトは **MIT ライセンス** です。詳細は [`LICENSE`](LICENSE) を参照。
+全てのヘッダーに関する詳細な仕様については、アプリケーションが提供するサンプルファイルを参照してください。
 
 ---
 
-## 著者
+### コミュニティと貢献
 
-清水　壮, 博士（農学）
+バグ報告、機能要望、プルリクエストを歓迎します。大きな変更を加える場合は、実装前に Issue で議論を開始してください。
 
-- Email: [parasitoidwasp.sou@gmail.com](mailto:parasitoidwasp.sou@gmail.com)
-- Affiriation: 農研機構
-- Personal homepage: [https://soshimizu.com/](https://soshimizu.com/)
-- Database: [https://ichneumonoidea-world.com/](https://ichneumonoidea-world.com/)
+- **GitHub リポジトリ**: [https://github.com/soshimizu/MyKeyLogue](https://github.com/soshimizu/MyKeyLogue)
+- **課題トラッカー**: [https://github.com/soshimizu/MyKeyLogue/issues](https://github.com/soshimizu/MyKeyLogue/issues)
+
+---
+
+### 引用について
+
+研究で MyKeyLogue を使用する場合は、ソフトウェア本体と、使用した特定の同定キー（マトリクス）の両方を引用してください。
+
+**ソフトウェア:**
+
+> Shimizu, S. (2025). _MyKeyLogue: A cross-platform desktop application for creating and using interactive multi-access taxonomic keys using statistical algorithms_. Journal of Open Source Software, X(Y), ZZZZ. https://doi.org/10.21105/joss.ZZZZZ (注: JOSS に採択され次第、DOI が付与されます)
+
+**データ:**
+
+> 使用したキーの`MatrixInfo`シートに記載されている、マトリクス著者の指定に従って引用してください。
+
+---
+
+### 著者とライセンス
+
+開発者: **清水 壮, 博士（農学）** (農研機構)
+
+本プロジェクトは**MIT ライセンス**の下で公開されています。詳細は[`LICENSE`](LICENSE)ファイルをご覧ください。

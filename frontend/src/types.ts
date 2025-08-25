@@ -1,4 +1,4 @@
-// frontend/src/types.ts（存在場所に合わせて置いてください）
+// frontend/src/types.ts
 
 export type Choice = -1 | 0 | 1;
 
@@ -42,3 +42,20 @@ export type TraitSuggestion = {
   // 状態の出現確率（診断・説明用）
   pStates?: { state: string; p: number }[];
 };
+
+// --- マトリクス編集機能のために追加 ---
+
+/**
+ * Type for identifying which CSV file is being edited in the matrix editor.
+ */
+export type CsvFileType = 'MatrixInfo' | 'TaxaInfo' | 'Traits';
+
+/**
+ * Represents the structure of the matrix data returned from the Go backend.
+ * This corresponds to the MatrixData struct in Go.
+ */
+export interface MatrixData {
+  matrixInfo: string[][];
+  taxaInfo: string[][];
+  traits: string[][];
+}
