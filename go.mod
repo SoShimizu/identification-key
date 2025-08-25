@@ -12,6 +12,8 @@ require (
 	golang.org/x/net v0.40.0
 )
 
+replace baliance.com/gooxml => github.com/baliance/gooxml v1.0.0
+
 require (
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect

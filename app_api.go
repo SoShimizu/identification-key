@@ -20,9 +20,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-// (他の関数 ... EnsureMyKeysAndSamplesからApplyFiltersAlgoOptまでは変更ありません)
-// ...
-
 // EnsureMyKeysAndSamples
 // keys/ と help_materials/ を確認し、空ならデモファイル群を自動生成
 func (a *App) EnsureMyKeysAndSamples() error {
@@ -270,7 +267,7 @@ func saveAsDocx(htmlContent string, path string) error {
 				props.SetBold(isBold)
 				props.SetItalic(isItalic)
 				if isUnderline {
-					props.SetUnderline(wml.ST_Underline_Single, color.Auto)
+					props.SetUnderline(wml.ST_UnderlineSingle, color.Auto)
 				}
 			}
 
