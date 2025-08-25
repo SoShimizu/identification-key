@@ -1,0 +1,39 @@
+// frontend/src/components/tabs/key/KeyViewTabPanel.tsx
+import React, { useState } from 'react';
+import { Box, Tab, Tabs } from '@mui/material';
+import { KeyTabPanel } from './KeyTabPanel';
+import RibbonSettingsTab from '../../header/RibbonSettingsTab';
+import { useMatrix } from '../../../hooks/useMatrix';
+
+export const KeyViewTabPanel: React.FC = () => {
+    const matrixState = useMatrix();
+    const [internalTab, setInternalTab] = useState('key');
+
+    const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
+        setInternalTab(newValue);
+    };
+
+    return (
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
+                <Tabs value={internalTab} onChange={handleTabChange} aria-label="key-view-tabs">
+                    <Tab label="KEY" value="key" />
+                    <Tab label="SETTINGS" value="settings" />
+                </Tabs>
+            </Box>
+            <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', p: internalTab === 'settings' ? 2 : 0 }}>
+                {internalTab === 'key' && <KeyTabPanel />}
+                {internalTab === 'settings' && (
+                    <RibbonSettingsTab
+                        lang={matrixState.lang}
+                        matrixName={matrixState.matrixName}
+                        algorithm={matrixState.algo}
+                        onAlgorithmChange={matrixState.setAlgo}
+                        opts={matrixState.opts}
+                        setOpts={matrixState.setOpts}
+                    />
+                )}
+            </Box>
+        </Box>
+    );
+};

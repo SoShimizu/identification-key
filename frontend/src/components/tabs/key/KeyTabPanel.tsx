@@ -1,6 +1,7 @@
+// frontend/src/components/tabs/key/KeyTabPanel.tsx
 import React, { useState } from 'react';
 import { Box, Drawer, Paper, Typography } from '@mui/material';
-import { useMatrix } from '../../../hooks/useMatrix'; // 親からpropsで受け取る代わりにここで直接使う
+import { useMatrix } from '../../../hooks/useMatrix'; 
 import CandidatesPanel from '../../panels/candidates/CandidatesPanel';
 import ComparisonPanel from '../../panels/comparison/ComparisonPanel';
 import TraitsTabsPanel from '../../panels/traits/TraitsTabsPanel';
@@ -10,19 +11,17 @@ import { STR } from '../../../i18n';
 import { Taxon, Trait } from '../../../api';
 import MatrixInfoPanel from '../../panels/matrix/MatrixInfoPanel';
 
-// Resizer components (App.tsxから移動)
 const ResizerX = ({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) => (
-    <Box onMouseDown={onMouseDown} sx={{ width: '8px', cursor: 'col-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <Box onMouseDown={onMouseDown} sx={{ width: '8px', cursor: 'col-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', my: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{width: '2px', height: '30px', bgcolor: 'background.default', borderRadius: '1px'}} />
     </Box>
 );
 const ResizerY = ({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) => (
-    <Box onMouseDown={onMouseDown} sx={{ height: '8px', cursor: 'row-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <Box onMouseDown={onMouseDown} sx={{ height: '8px', cursor: 'row-resize', bgcolor: 'divider', transition: 'background-color 0.2s ease', '&:hover': { bgcolor: 'primary.main' }, borderRadius: '4px', mx: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{height: '2px', width: '30px', bgcolor: 'background.default', borderRadius: '1px'}} />
     </Box>
 );
 
-// App.tsxが受け持っていたpropsをuseMatrixから直接取得
 export const KeyTabPanel: React.FC = () => {
     const {
         matrixInfo,
@@ -114,31 +113,29 @@ export const KeyTabPanel: React.FC = () => {
 
     return (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ flex: 1, p: 2, gap: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
-                {/* Left Panel: Info */}
+            <Box sx={{ flex: 1, p: 1, gap: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
                 <Box sx={{ width: `${leftPanelWidth}%`, display: 'flex', flexDirection: 'column', gap: 1, minHeight: 0, minWidth: '250px' }}>
-                    <Box sx={{ height: `${leftTopPanelHeight}%`, minHeight: '100px' }}>
+                    <Paper elevation={2} sx={{ height: `${leftTopPanelHeight}%`, minHeight: '100px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         <MatrixInfoPanel info={matrixInfo} lang={lang} />
-                    </Box>
+                    </Paper>
 
                     <ResizerY onMouseDown={createVerticalResizer(setLeftTopPanelHeight)} />
                     
-                    <Box sx={{ flex: 1, minHeight: '100px' }}>
+                    <Paper elevation={2} sx={{ flex: 1, minHeight: '100px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         {detailView?.type === 'taxon' && <TaxonDetailPanel taxon={detailView.content} lang={lang} />}
                         {detailView?.type === 'trait' && <HelpDisplay trait={detailView.content} lang={lang} />}
                         {!detailView && (
-                            <Paper variant="outlined" sx={{height: '100%', p:2, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                            <Box sx={{height: '100%', width: '100%', p:2, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                 <Typography color="text.secondary">Select a taxon to see details or a trait to see help.</Typography>
-                            </Paper>
+                            </Box>
                         )}
-                    </Box>
+                    </Paper>
                 </Box>
 
                 <ResizerX onMouseDown={handleMouseDownX} />
 
-                {/* Right Panel: Interaction */}
                 <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, minHeight: 0, minWidth: '400px' }}>
-                    <Box sx={{ height: `${rightTopPanelHeight}%`, minHeight: '150px' }}>
+                    <Paper elevation={2} sx={{ height: `${rightTopPanelHeight}%`, minHeight: '150px', display: 'flex' }}>
                         <CandidatesPanel
                             lang={lang}
                             title={T.panels.candidates}
@@ -152,11 +149,11 @@ export const KeyTabPanel: React.FC = () => {
                             selected={selected}
                             selectedMulti={selectedMulti}
                         />
-                    </Box>
+                    </Paper>
                     
                     <ResizerY onMouseDown={createVerticalResizer(setRightTopPanelHeight)} />
 
-                    <Box sx={{ flex: 1, minHeight: '100px' }}>
+                    <Paper elevation={2} sx={{ flex: 1, minHeight: '100px', display: 'flex' }}>
                         <TraitsTabsPanel
                             lang={lang}
                             rows={rows}
@@ -180,7 +177,7 @@ export const KeyTabPanel: React.FC = () => {
                             canUndo={canUndo}
                             canRedo={canRedo}
                         />
-                    </Box>
+                    </Paper>
                 </Box>
             </Box>
             <Drawer
