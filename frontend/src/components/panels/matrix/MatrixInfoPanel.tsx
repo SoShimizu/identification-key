@@ -1,12 +1,7 @@
 // frontend/src/components/panels/matrix/MatrixInfoPanel.tsx
-import React, { useState } from 'react';
-import { Box, Typography, Paper, Link, Divider, Tabs, Tab } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, Typography, Paper, Tabs, Tab } from '@mui/material';
 import { MatrixInfo } from '../../../api';
-
-type Props = {
-    info: MatrixInfo | null;
-    lang: 'ja' | 'en';
-};
 
 const HtmlRenderer: React.FC<{ content: string, component?: React.ElementType, variant?: string }> = ({ content, component, variant }) => {
     return <Typography variant={variant as any || "body2"} component={component || "div"} sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: content }} />;
@@ -22,32 +17,47 @@ const InfoRow: React.FC<{ label: string; value?: string | null; isHtml?: boolean
     );
 };
 
+type Props = {
+    info: MatrixInfo | null;
+    lang: 'ja' | 'en';
+};
+
 export default function MatrixInfoPanel({ info, lang }: Props) {
     const [activeTab, setActiveTab] = useState(0);
+    const isJa = lang === 'ja';
+
+    // ★ infoオブジェクトが存在するかどうかで条件分岐させる
+    const description = info ? (isJa ? info.description_jp || info.description_en : info.description_en || info.description_jp) : null;
+    const authors = info ? (isJa ? info.authors_jp || info.authors_en : info.authors_en || info.authors_jp) : null;
+    const citation = info ? (isJa ? info.citation_jp || info.citation_en : info.citation_en || info.citation_jp) : null;
+    const references = info ? (isJa ? info.references_jp || info.references_en : info.references_en || info.references_jp) : null;
+
+    const tabs = useMemo(() => {
+        const newTabs = [];
+        if (description) newTabs.push(isJa ? "解説" : "Description");
+        if (authors || citation) newTabs.push(isJa ? "著者と引用" : "Authors & Citation");
+        if (references) newTabs.push(isJa ? "参考文献" : "References");
+        return newTabs;
+    }, [description, authors, citation, references, isJa]);
+    
+    // ★ フックの呼び出し順序を修正
+    useEffect(() => {
+        console.log('[MatrixInfoPanel] Component re-rendered. Received info:', info);
+        if (activeTab >= tabs.length) {
+            setActiveTab(0);
+        }
+    }, [info, tabs, activeTab]);
 
     if (!info) {
         return (
-            <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography color="text.secondary">Matrix information loading...</Typography>
+            <Paper variant="outlined" sx={{ height: '100%', width: '100%', p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography color="text.secondary">Matrix information not available.</Typography>
             </Paper>
         );
     }
-    
-    const isJa = lang === 'ja';
-
-    const tabs = [];
-    const description = isJa ? info.description_jp || info.description_en : info.description_en || info.description_jp;
-    const authors = isJa ? info.authors_jp || info.authors_en : info.authors_en || info.authors_jp;
-    const citation = isJa ? info.citation_jp || info.citation_en : info.citation_en || info.citation_jp;
-    const references = isJa ? info.references_jp || info.references_en : info.references_en || info.references_jp;
-
-    if (description) tabs.push(isJa ? "解説" : "Description");
-    if (authors || citation) tabs.push(isJa ? "著者と引用" : "Authors & Citation");
-    if (references) tabs.push(isJa ? "参考文献" : "References");
-
 
     return (
-        <Paper variant="outlined" sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}>
+        <Paper variant="outlined" sx={{ height: '100%', width: '100%', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <Box sx={{flexShrink: 0}}>
                 <HtmlRenderer
                     content={isJa ? info.title_jp || info.title_en : info.title_en || info.title_jp}

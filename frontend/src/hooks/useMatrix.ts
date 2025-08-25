@@ -17,6 +17,7 @@ type HistoryState = {
 
 type UseMatrixReturn = {
   matrixInfo: MatrixInfo | null;
+  setMatrixInfo: Dispatch<SetStateAction<MatrixInfo | null>>; // ★ この行を追加
   rows: TraitRow[];
   traits: Trait[];
   matrixName: string;
@@ -116,7 +117,6 @@ export function useMatrix(): UseMatrixReturn {
       await EnsureMyKeysAndSamples();
       const list = (await ListMyKeys()) as KeyInfo[];
       setKeys(list);
-      // Don't automatically change the active key on refresh, just update the list
     } catch (error) {
       console.error("Failed to refresh keys:", error);
     }
@@ -135,7 +135,19 @@ export function useMatrix(): UseMatrixReturn {
   const pickKey = useCallback(async (name: string) => {
     try {
       setActiveKey(name);
-      await PickKey(name);
+      if(name) {
+        await PickKey(name);
+      } else {
+        // If name is empty, clear the matrix state
+        setMatrixInfo(null);
+        setTraits([]);
+        setTaxaCount(0);
+        setMatrixName("");
+        setHistory([{ selected: {}, selectedMulti: {}, log: { traitName: "Initial State", selection: "", timestamp: Date.now() } }]);
+        setHistoryIndex(0);
+        setScores([]);
+        setSuggs([]);
+      }
     } catch (error) {
       console.error(`Failed to pick key "${name}":`, error);
     }
@@ -145,6 +157,10 @@ export function useMatrix(): UseMatrixReturn {
   const loadMatrix = useCallback(async () => {
     try {
       const m: Matrix = await (window as any).go.main.App.GetMatrix();
+      if (!m || !m.name) { // Handle case where no key is selected
+        pickKey('');
+        return;
+      };
       setMatrixInfo(m.info ?? null);
       setTraits(m.traits ?? []);
       setTaxaCount(m.taxa?.length ?? 0);
@@ -164,7 +180,7 @@ export function useMatrix(): UseMatrixReturn {
       setMatrixName("Error loading matrix");
       lastEvaluatedState.current = null;
     }
-  }, []);
+  }, [pickKey]);
 
   useEffect(() => {
     const initialLoad = async () => {
@@ -295,44 +311,36 @@ export function useMatrix(): UseMatrixReturn {
     return out;
   }, [traits, lang]);
 
-  return {
-    matrixInfo,
-    rows,
-    traits,
-    matrixName,
-    taxaCount,
-    selected,
-    selectedMulti,
-    setBinary,
-    setContinuous,
-    setMulti,
-    setMultiAsNA,
-    setDerivedPick,
-    clearDerived,
-    clearAllSelections,
-    mode,
-    setMode,
-    algo,
-    setAlgo,
-    opts,
-    setOpts,
-    scores,
-    suggs,
-    suggMap,
-    sortBy,
-    setSortBy,
-    suggAlgo,
-    setSuggAlgo,
-    pickKey,
-    keys,
-    activeKey,
-    refreshKeys,
+  return useMemo(() => ({
+    matrixInfo, setMatrixInfo,
+    rows, traits, matrixName, taxaCount,
+    selected, selectedMulti,
+    setBinary, setContinuous, setMulti, setMultiAsNA,
+    setDerivedPick, clearDerived, clearAllSelections,
+    mode, setMode,
+    algo, setAlgo,
+    opts, setOpts,
+    scores, suggs, suggMap,
+    sortBy, setSortBy,
+    suggAlgo, setSuggAlgo,
+    pickKey, keys, activeKey, refreshKeys,
     history: currentHistoryLogs,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    lang,
-    setLang,
-  };
+    undo, redo, canUndo, canRedo,
+    lang, setLang,
+  }), [
+    matrixInfo, rows, traits, matrixName, taxaCount,
+    selected, selectedMulti,
+    setBinary, setContinuous, setMulti, setMultiAsNA,
+    setDerivedPick, clearDerived, clearAllSelections,
+    mode, setMode,
+    algo, setAlgo,
+    opts, setOpts,
+    scores, suggs, suggMap,
+    sortBy, setSortBy,
+    suggAlgo, setSuggAlgo,
+    pickKey, keys, activeKey, refreshKeys,
+    currentHistoryLogs,
+    undo, redo, canUndo, canRedo,
+    lang, setLang,
+  ]);
 }

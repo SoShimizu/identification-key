@@ -1,17 +1,21 @@
 // frontend/src/components/tabs/report/ReportTabPanel.tsx
-import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Button, Typography, Paper, Stack, Divider, Tooltip, IconButton } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Button, Typography, Paper, Stack } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useMatrix } from '../../../hooks/useMatrix';
+import { GenerateIdentificationReport, SaveReportDialog } from '../../../../wailsjs/go/main/App';
 import { main } from '../../../../wailsjs/go/models';
 import { STR } from '../../../i18n';
-import { SaveReportDialog } from '../../../../wailsjs/go/main/App';
+import { MatrixInfo, TaxonScore } from '../../../api';
 
-// バックエンドのGoコードからレポート生成ロジックをJSで再現
 const generateReportText = (matrixState: any, lang: 'ja' | 'en'): string => {
-    const s = STR[lang].report; // i18n.ts に report セクションを後で追加
+    const s = STR[lang].report;
     const { matrixName, algo, opts, history, scores, matrixInfo } = matrixState;
+
+    if (!matrixInfo) {
+        return lang === 'ja' ? "マトリクスが読み込まれていません。" : "No matrix is loaded.";
+    }
 
     let sb = '';
     const hr = "--------------------------------------------------\n";
@@ -24,10 +28,10 @@ const generateReportText = (matrixState: any, lang: 'ja' | 'en'): string => {
     sb += `${s.date}: ${now.toLocaleString(lang)}\n\n`;
 
     sb += hr + `${s.matrixInfoTitle}\n` + hr;
-    const matrixTitle = lang === 'ja' ? matrixInfo?.title_jp || matrixInfo?.title_en : matrixInfo?.title_en || matrixInfo?.title_jp;
+    const matrixTitle = lang === 'ja' ? matrixInfo.title_jp || matrixInfo.title_en : matrixInfo.title_en || matrixInfo.title_jp;
     sb += `  - ${s.matrixFile}: ${matrixName}\n`;
     sb += `  - ${s.matrixTitle}: ${matrixTitle || 'N/A'}\n`;
-    sb += `  - ${s.matrixVersion}: ${matrixInfo?.version || 'N/A'}\n\n`;
+    sb += `  - ${s.matrixVersion}: ${matrixInfo.version || 'N/A'}\n\n`;
 
     sb += hr + `${s.parametersUsed}\n` + hr;
     sb += `  - ${s.algorithm}: ${algo}\n`;
@@ -55,7 +59,7 @@ const generateReportText = (matrixState: any, lang: 'ja' | 'en'): string => {
         const header = `${s.rankHeader.padEnd(6)} ${s.taxonHeader.padEnd(40)} ${s.scoreHeader.padEnd(15)} ${s.conflictsHeader.padEnd(12)} ${s.matchSupportHeader.padEnd(10)}\n`;
         sb += header;
         sb += "".padEnd(85, "-") + "\n";
-        scores.slice(0, 10).forEach((score: any, i: number) => {
+        scores.slice(0, 10).forEach((score: TaxonScore, i: number) => {
             const probStr = (score.post * 100).toFixed(2) + '%';
             const matchSupport = `${score.match}/${score.support}`;
             const taxonName = score.taxon.name || score.taxon.id;
@@ -70,38 +74,44 @@ const generateReportText = (matrixState: any, lang: 'ja' | 'en'): string => {
     return sb;
 };
 
-
 export const ReportTabPanel: React.FC = () => {
     const matrixState = useMatrix();
-    const { lang, history } = matrixState;
+    const { lang, history, scores, matrixInfo, algo, opts, matrixName } = matrixState;
     const [reportText, setReportText] = useState('');
 
     useEffect(() => {
+        console.log('[ReportTabPanel] useEffect triggered. Recalculating report text.');
+        console.log(`[ReportTabPanel] Dependencies: history length=${history.length}, scores length=${scores.length}, matrixName=${matrixName}, lang=${lang}`);
+        
         const newText = generateReportText(matrixState, lang);
         setReportText(newText);
-    }, [matrixState, lang]);
+    }, [matrixState, lang]); // ★ 依存配列を修正
 
     const handleSave = async () => {
         const now = new Date();
         const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-        const topCandidateName = matrixState.scores.length > 0 ? matrixState.scores[0].taxon.name.replace(/[^a-zA-Z0-9]/g, '_') : 'unknown';
+        const topCandidateName = scores.length > 0 ? scores[0].taxon.name.replace(/[^a-zA-Z0-9]/g, '_') : 'unknown';
         const defaultName = `MyKeyLogue_Report_${timestamp}_${topCandidateName}.txt`;
 
         try {
             const path = await SaveReportDialog(defaultName);
+
             if (path) {
-                // GenerateIdentificationReport はバックエンドでテキストを生成するため、ここでは使用しない
-                // 代わりにフロントで生成したテキストを直接保存する
-                // このためにはバックエンドにテキストを保存する関数が必要になるが、
-                // Wailsの標準機能にはないため、ここではクリップボードコピーで代用する
-                // 本来はバックエンドに `SaveTextToFile(path, content)` のような関数を実装する
-                await navigator.clipboard.writeText(reportText);
-                alert(`Report content copied to clipboard. Please paste it into the file: ${path}`);
+                const reportRequest = new main.ReportRequest({
+                    lang: lang,
+                    matrixName: matrixName,
+                    algorithm: algo,
+                    options: opts,
+                    history: history,
+                    finalScores: scores,
+                    matrixInfo: matrixInfo as MatrixInfo,
+                });
+                await GenerateIdentificationReport(reportRequest, path);
+                alert(`Report saved to: ${path}`);
             }
         } catch (error) {
             console.error("Failed to save report:", error);
-            alert("Failed to save report. Content copied to clipboard instead.");
-            await navigator.clipboard.writeText(reportText);
+            alert("Failed to save report.");
         }
     };
     
@@ -133,7 +143,7 @@ export const ReportTabPanel: React.FC = () => {
                     </Button>
                 </Stack>
             </Stack>
-            <Paper variant="outlined" sx={{ flex: 1, p: 2, fontFamily: 'monospace', whiteSpace: 'pre', overflow: 'auto' }}>
+            <Paper variant="outlined" sx={{ flex: 1, p: 2, fontFamily: 'monospace', whiteSpace: 'pre', overflow: 'auto', fontSize: '0.8rem' }}>
                 {history.length > 0 ? reportText : "No identification session is active. Please select some traits in the KEY tab to generate a report."}
             </Paper>
         </Box>

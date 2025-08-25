@@ -1,5 +1,4 @@
 // frontend/src/App.tsx
-
 import React, { useState, useEffect, useCallback } from "react";
 import { 
     CssBaseline, ThemeProvider, createTheme, Box, Tab, Tabs, AppBar, Toolbar, Typography, 
@@ -28,6 +27,7 @@ import { ReportTabPanel } from "./components/tabs/report/ReportTabPanel";
 import * as api from '../wailsjs/go/main/App';
 import { MatrixData } from "./types";
 import MatrixInfoEditorDialog from "./components/header/MatrixInfoEditorDialog";
+import { MatrixInfo } from "./api";
 
 const fontLink = document.createElement('link');
 fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap";
@@ -111,16 +111,44 @@ export default function App() {
       }
   };
 
-  const handleSaveMatrixInfo = async (newMatrixInfo: string[][]) => {
+  const handleSaveMatrixInfo = async (newMatrixInfoData: string[][]) => {
       if (currentMatrixData && matrixState.activeKey) {
-        const newData = { ...currentMatrixData, matrixInfo: newMatrixInfo };
+        const newData = { ...currentMatrixData, matrixInfo: newMatrixInfoData };
         try {
             await api.SaveMatrix(matrixState.activeKey, newData);
             setCurrentMatrixData(newData);
+
+            const infoObject = newMatrixInfoData.reduce((acc, row) => {
+              if (row && row.length >= 2) { acc[row[0]] = row[1]; }
+              return acc;
+            }, {} as Record<string, string>);
+
+            const newMatrixInfo: MatrixInfo = {
+                title_en: infoObject.title_en || '', title_jp: infoObject.title_jp || '',
+                version: infoObject.version || '', description_en: infoObject.description_en || '',
+                description_jp: infoObject.description_jp || '', authors_en: infoObject.authors_en || '',
+                authors_jp: infoObject.authors_jp || '', contact_en: infoObject.contact_en || '',
+                contact_jp: infoObject.contact_jp || '', citation_en: infoObject.citation_en || '',
+                citation_jp: infoObject.citation_jp || '', references_en: infoObject.references_en || '',
+                references_jp: infoObject.references_jp || '',
+            };
+            
+            console.log('[App.tsx] Saving new MatrixInfo. New data object:', newMatrixInfo);
+            matrixState.setMatrixInfo(newMatrixInfo);
+
             alert("Matrix metadata saved successfully!");
         } catch (error) {
             alert("Failed to save matrix metadata.");
         }
+      }
+  };
+  
+  const handleReloadCurrentMatrix = () => {
+      if (matrixState.activeKey) {
+          console.log(`[App.tsx] Reloading current matrix: ${matrixState.activeKey}`);
+          matrixState.pickKey(matrixState.activeKey);
+      } else {
+          console.log('[App.tsx] No active matrix to reload.');
       }
   };
 
@@ -185,7 +213,9 @@ export default function App() {
                 </Stack>
             </Toolbar>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.5, bgcolor: 'action.hover', flexWrap: 'wrap' }}>
-                <Typography variant="body2" sx={{fontWeight: 'bold'}}>Matrix Directory:</Typography>
+                <Typography variant="body2" sx={{fontWeight: 'bold'}}>
+                    Matrix Directory:
+                </Typography>
                 <Tooltip title={keysDirectory}>
                     <Typography variant="body2" sx={{
                         fontFamily: 'monospace', bgcolor: 'background.default', px: 1, py: 0.5, borderRadius: 1,
@@ -200,7 +230,11 @@ export default function App() {
                 </Tooltip>
                 <Box sx={{ flexGrow: 1 }} />
                 <Stack direction="row" spacing={1} alignItems="center">
-                    <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleNewMatrix}>New Matrix</Button>
+                    <Tooltip title="New Matrix">
+                      <IconButton size="small" onClick={handleNewMatrix}>
+                          <AddIcon />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Edit Matrix Metadata">
                         <span>
                             <IconButton size="small" onClick={() => setIsInfoEditorOpen(true)} disabled={!matrixState.activeKey || !currentMatrixData}>
@@ -221,8 +255,12 @@ export default function App() {
                             </Select>
                         </FormControl>
                     </Tooltip>
-                    <Tooltip title={T.ribbon.refresh_keys}>
-                        <IconButton size="small" onClick={matrixState.refreshKeys}><RefreshIcon /></IconButton>
+                    <Tooltip title="Reload current matrix">
+                       <span>
+                            <IconButton size="small" onClick={handleReloadCurrentMatrix} disabled={!matrixState.activeKey}>
+                                <RefreshIcon />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                 </Stack>
             </Box>
@@ -240,10 +278,10 @@ export default function App() {
                 </Tabs>
             </Box>
             <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
-                <Box sx={{ height: '100%', visibility: keySubTab === 'key' ? 'visible' : 'hidden', position: 'absolute', inset: 0 }}>
+                <Box sx={{ height: '100%', display: keySubTab === 'key' ? 'block' : 'none' }}>
                     <KeyTabPanel />
                 </Box>
-                <Box sx={{ height: '100%', visibility: keySubTab === 'settings' ? 'visible' : 'hidden', position: 'absolute', inset: 0, overflowY: 'auto' }}>
+                <Box sx={{ height: '100%', display: keySubTab === 'settings' ? 'block' : 'none', overflowY: 'auto' }}>
                     <Box sx={{p: 2}}>
                         <RibbonSettingsTab
                             lang={matrixState.lang} matrixName={matrixState.matrixName} algorithm={matrixState.algo}
